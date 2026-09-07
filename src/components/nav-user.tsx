@@ -93,9 +93,7 @@ export function NavUser({ user, organizationSlug }: NavUserProps) {
               >
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={user.image ?? undefined} alt={user.name} />
-                  <AvatarFallback>
-                    {getInitials(user.name)}
-                  </AvatarFallback>
+                  <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">{user.name}</span>
@@ -140,12 +138,14 @@ export function NavUser({ user, organizationSlug }: NavUserProps) {
             </DropdownMenuGroup> */}
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <Link href={`/org/${organizationSlug}/account-settings`} className="flex gap-2 items-center">
+              <Link
+                href={`/org/${organizationSlug}/account-settings`}
+              >
+                <DropdownMenuItem>
                   <BadgeCheckIcon />
                   Account Settings
-                </Link>
-              </DropdownMenuItem>
+                </DropdownMenuItem>
+              </Link>
               {/* <DropdownMenuItem>
                 <CreditCardIcon />
                 Billing
