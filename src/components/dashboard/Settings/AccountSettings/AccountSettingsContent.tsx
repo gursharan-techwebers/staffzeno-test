@@ -32,11 +32,6 @@ const AccountSettingsContent = ({
 
   return (
     <>
-      <DashboardPageHeader
-        title="Account Settings"
-        description="Manage your personal information and account security."
-      />
-
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList>
           <TabsTrigger
@@ -64,7 +59,7 @@ const AccountSettingsContent = ({
           <SecuritySettings
             lastPasswordChangedAt={lastPasswordChangedAt}
             sessions={sessions}
-             hasPassword={user.hasPassword}
+            hasPassword={user.hasPassword}
           />
         </TabsContent>
       </Tabs>

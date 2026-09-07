@@ -31,6 +31,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import Loader from "./shared/Loader";
 import { getInitials } from "@/lib/utils";
+import Link from "next/link";
 
 type NavUserProps = {
   user: {
@@ -73,10 +74,6 @@ export function NavUser({ user, organizationSlug }: NavUserProps) {
     } finally {
       setIsLoggingOut(false);
     }
-  };
-
-  const onAccountClick = () => {
-    router.push(`/org/${organizationSlug}/account-settings`);
   };
 
   return (
@@ -143,9 +140,11 @@ export function NavUser({ user, organizationSlug }: NavUserProps) {
             </DropdownMenuGroup> */}
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem onClick={onAccountClick}>
-                <BadgeCheckIcon />
-                Account Settings
+              <DropdownMenuItem>
+                <Link href={`/org/${organizationSlug}/account-settings`} className="flex gap-2 items-center">
+                  <BadgeCheckIcon />
+                  Account Settings
+                </Link>
               </DropdownMenuItem>
               {/* <DropdownMenuItem>
                 <CreditCardIcon />

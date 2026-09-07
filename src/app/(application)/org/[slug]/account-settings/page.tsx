@@ -4,6 +4,7 @@ import AccountSettingsContent from "@/components/dashboard/Settings/AccountSetti
 
 import { getCurrentUser } from "@/server/user/getCurrentUser";
 import { getUserSessions } from "@/server/user/getUserSessions";
+import { DashboardPageHeader } from "@/components/dashboard/dashboardPageHeader";
 
 type Props = {
   params: Promise<{
@@ -21,11 +22,18 @@ const AccountSettings = async ({ params: _params }: Props) => {
   const sessions = await getUserSessions();
 
   return (
-    <AccountSettingsContent
-      user={user}
-      lastPasswordChangedAt={user.lastPasswordChangedAt}
-      sessions={sessions}
-    />
+    <>
+      <DashboardPageHeader
+        title="Account Settings"
+        description="Manage your personal information and account security."
+      />
+
+      <AccountSettingsContent
+        user={user}
+        lastPasswordChangedAt={user.lastPasswordChangedAt}
+        sessions={sessions}
+      />
+    </>
   );
 };
 
