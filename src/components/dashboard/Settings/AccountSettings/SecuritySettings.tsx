@@ -284,8 +284,6 @@ const SecuritySettings = ({
 
   const hasOtherSessions = sessions.some((session) => !session.isCurrent);
 
-  console.log(hasPassword);
-
   return (
     <>
       <div className="max-w-xl space-y-8">

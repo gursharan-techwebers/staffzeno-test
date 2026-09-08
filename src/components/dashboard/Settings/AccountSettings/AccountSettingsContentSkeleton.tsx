@@ -1,6 +1,6 @@
 export function AccountSettingsContentSkeleton() {
   return (
-    <div className="w-full max-w-3xl">
+    <div className="w-full max-w-xl">
       {/* Tabs */}
       <div className="flex h-10 w-fit items-center gap-1 rounded-full bg-muted p-1">
         <div className="h-8 w-24 animate-pulse rounded-full bg-background" />

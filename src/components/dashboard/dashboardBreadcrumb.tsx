@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/breadcrumb";
 
 import { createBreadcrumbs } from "@/lib/createBreadcrumbs";
+import { DashboardLink } from "./DashboardLink";
 
 type DashboardBreadcrumbProps = {
   organizationName: string;
@@ -46,6 +47,10 @@ export function DashboardBreadcrumb({
               <BreadcrumbItem>
                 {isLast ? (
                   <BreadcrumbPage>{breadcrumb.label}</BreadcrumbPage>
+                ) : breadcrumb.href ? (
+                  <DashboardLink href={breadcrumb.href}>
+                    {breadcrumb.label}
+                  </DashboardLink>
                 ) : (
                   <BreadcrumbLink href={breadcrumb.href}>
                     {breadcrumb.label}

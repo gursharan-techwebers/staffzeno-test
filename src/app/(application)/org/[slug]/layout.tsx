@@ -14,6 +14,9 @@ import { getUserTeams } from "@/server/team/getUserTeams";
 import { getOrganizationTeams } from "@/server/team/getOrganizationTeams";
 
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
+import DashboardContentSkeleton from "@/components/dashboard/DashboardContentSkeleton";
+import { TopLoadingBar } from "@/components/dashboard/TopLoadingBar";
 
 type Props = {
   children: React.ReactNode;
@@ -47,6 +50,8 @@ const DashboardLayout = async ({ children, params }: Props) => {
 
   return (
     <SidebarProvider>
+      <TopLoadingBar />
+
       <AppSidebar
         organization={organization}
         allUserOrganizations={allUserOrganizations}
@@ -74,7 +79,9 @@ const DashboardLayout = async ({ children, params }: Props) => {
         </header>
 
         <div className="mt-4 flex flex-1 flex-col gap-4 p-5 pt-0">
-          {children}
+          <Suspense fallback={<DashboardContentSkeleton />}>
+            {children}
+          </Suspense>
         </div>
       </SidebarInset>
     </SidebarProvider>

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
   MoreHorizontalIcon,
@@ -42,13 +41,15 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 
 import { removeTeam } from "@/server/team/removeTeam";
 import { ManageTeamDialog } from "../ManageTeamDialog";
 
 import { Team } from "@/types/team/team";
+import { DashboardLink } from "../../DashboardLink";
+import { UserProfile } from "../../UserProfile";
+import UserNameAndTitle from "@/components/shared/dashboard/UserNameAndTitle";
 
 type TeamTableProps = {
   teams: Team[];
@@ -69,17 +70,6 @@ const formatDate = (date: Date) => {
     day: "numeric",
     year: "numeric",
   }).format(new Date(date));
-};
-
-const getInitials = (name: string) => {
-  return name
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0))
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
 };
 
 export function AllTeamsTable({
@@ -164,12 +154,12 @@ export function AllTeamsTable({
                   {/* Team */}
                   <TableCell>
                     <div className="min-w-0">
-                      <Link
+                      <DashboardLink
                         href={`/org/${slug}/teams/${team.id}`}
                         className="truncate font-medium"
                       >
                         {team.name}
-                      </Link>
+                      </DashboardLink>
                     </div>
                   </TableCell>
 
@@ -189,22 +179,10 @@ export function AllTeamsTable({
                   <TableCell>
                     {primaryAdmin ? (
                       <div className="flex items-center gap-3">
-                        <Avatar className="size-8 shrink-0">
-                          <AvatarImage
-                            src={primaryAdmin.image ?? undefined}
-                            alt={primaryAdmin.name}
-                          />
-
-                          <AvatarFallback>
-                            {getInitials(primaryAdmin.name)}
-                          </AvatarFallback>
-                        </Avatar>
+                        <UserProfile user={primaryAdmin} title={primaryAdmin.title || ""}/>
 
                         <div className="min-w-0">
-                          <p className="truncate font-medium">
-                            {primaryAdmin.name}
-                          </p>
-
+                          <UserNameAndTitle name={primaryAdmin.name} />
                           {admins.length > 1 && (
                             <p className="text-xs text-muted-foreground">
                               +{admins.length - 1} more

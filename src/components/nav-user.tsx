@@ -8,7 +8,12 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -25,13 +30,19 @@ import {
   CreditCardIcon,
   BellIcon,
   LogOutIcon,
+  PaletteIcon,
+  SunIcon,
+  MoonIcon,
+  MonitorIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import Loader from "./shared/Loader";
 import { getInitials } from "@/lib/utils";
 import Link from "next/link";
+import { useTheme } from "next-themes";
+import { DashboardLink } from "./dashboard/DashboardLink";
 
 type NavUserProps = {
   user: {
@@ -44,6 +55,13 @@ type NavUserProps = {
 
 export function NavUser({ user, organizationSlug }: NavUserProps) {
   const { isMobile } = useSidebar();
+  const { theme, setTheme } = useTheme();
+
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
@@ -129,23 +147,21 @@ export function NavUser({ user, organizationSlug }: NavUserProps) {
                 </div>
               </div>
             </DropdownMenuLabel>
-            {/* <DropdownMenuSeparator /> */}
-            {/* <DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
               <DropdownMenuItem>
                 <SparklesIcon />
                 Upgrade to Pro
               </DropdownMenuItem>
-            </DropdownMenuGroup> */}
+            </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <Link
-                href={`/org/${organizationSlug}/account-settings`}
-              >
+              <DashboardLink href={`/org/${organizationSlug}/account-settings`}>
                 <DropdownMenuItem>
                   <BadgeCheckIcon />
                   Account Settings
                 </DropdownMenuItem>
-              </Link>
+              </DashboardLink>
               {/* <DropdownMenuItem>
                 <CreditCardIcon />
                 Billing
@@ -156,6 +172,40 @@ export function NavUser({ user, organizationSlug }: NavUserProps) {
               </DropdownMenuItem> */}
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
+            {mounted && (
+              <>
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>
+                    <PaletteIcon />
+                    Theme
+                  </DropdownMenuSubTrigger>
+
+                  <DropdownMenuSubContent>
+                    <DropdownMenuRadioGroup
+                      value={theme}
+                      onValueChange={setTheme}
+                    >
+                      <DropdownMenuRadioItem value="light">
+                        <SunIcon />
+                        Light
+                      </DropdownMenuRadioItem>
+
+                      <DropdownMenuRadioItem value="dark">
+                        <MoonIcon />
+                        Dark
+                      </DropdownMenuRadioItem>
+
+                      <DropdownMenuRadioItem value="system">
+                        <MonitorIcon />
+                        System
+                      </DropdownMenuRadioItem>
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+                <DropdownMenuSeparator />
+              </>
+            )}
+
             <DropdownMenuItem onClick={onLogoutClick}>
               {isLoggingOut ? (
                 <Loader />

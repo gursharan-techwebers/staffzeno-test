@@ -2,11 +2,9 @@
 
 import { useState } from "react";
 import {
-  MailIcon,
   MoreHorizontalIcon,
   Trash2Icon,
   User,
-  UserIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -40,14 +38,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-
 import type { TeamMember } from "@/server/team/getTeamFromId";
 import { Badge } from "@/components/ui/badge";
 import { updateTeamMemberRole } from "@/server/team/updateTeamMemberRole";
 import { removeTeamMember } from "@/server/team/removeTeamMember";
 import { Separator } from "@/components/ui/separator";
-import { getInitials } from "@/lib/utils";
+import { UserProfile } from "../../UserProfile";
+import UserNameAndTitle from "@/components/shared/dashboard/UserNameAndTitle";
 
 type TeamMemberTableProps = {
   teamId: string;
@@ -242,26 +239,11 @@ export default function TeamMemberTable({
                 {/* Employee */}
                 <TableCell>
                   <div className="flex items-center gap-3">
-                    <Avatar className="size-8 shrink-0">
-                      <AvatarImage
-                        src={member.image ?? undefined}
-                        alt={member.name}
-                      />
-
-                      <AvatarFallback>
-                        {getInitials(member.name)}
-                      </AvatarFallback>
-                    </Avatar>
-
-                    <div className="min-w-0">
-                      <p className="truncate font-medium">
-                        {member.name}
-
-                        <span className="ml-2 text-sm text-muted-foreground">
-                          {member.title ? `(${member.title})` : ""}
-                        </span>
-                      </p>
-                    </div>
+                    <UserProfile user={member} title={member.title || ""}/>
+                    <UserNameAndTitle
+                      name={member.name}
+                      title={member.title || ""}
+                    />
                   </div>
                 </TableCell>
 
@@ -364,24 +346,12 @@ export default function TeamMemberTable({
           {memberToRemove && (
             <div className="rounded-lg">
               <div className="flex items-center gap-3">
-                <Avatar className="size-10">
-                  <AvatarImage
-                    src={memberToRemove.image ?? undefined}
-                    alt={memberToRemove.name}
-                  />
+                <UserProfile user={memberToRemove} title={memberToRemove.title || ""}/>
 
-                  <AvatarFallback>
-                    <UserIcon className="size-4 text-muted-foreground" />
-                  </AvatarFallback>
-                </Avatar>
-
-                <div className="min-w-0">
-                  <p className="truncate font-medium">{memberToRemove.name}</p>
-
-                  <p className="truncate text-sm text-muted-foreground">
-                    {memberToRemove.email}
-                  </p>
-                </div>
+                <UserNameAndTitle
+                  name={memberToRemove.name}
+                  title={memberToRemove.title || ""}
+                />
               </div>
             </div>
           )}
@@ -410,4 +380,4 @@ export default function TeamMemberTable({
       </AlertDialog>
     </>
   );
-};
+}

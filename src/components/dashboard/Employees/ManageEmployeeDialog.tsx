@@ -14,12 +14,10 @@ import {
 
 import {
   Field,
-  FieldDescription,
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -32,7 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-import { ShieldCheckIcon, UserIcon, UsersIcon } from "lucide-react";
+import { UsersIcon } from "lucide-react";
 
 import { toast } from "sonner";
 
@@ -44,6 +42,8 @@ import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 
 import { titleSchemaInput } from "@/validators/organization/common";
+import { UserProfile } from "../UserProfile";
+import UserNameAndTitle from "@/components/shared/dashboard/UserNameAndTitle";
 
 type EmployeeRole = "admin" | "member";
 
@@ -190,24 +190,11 @@ export function ManageEmployeeDialog({
           {/* Employee */}
           <div className="rounded-lg">
             <div className="flex items-center gap-3">
-              <Avatar className="size-10">
-                <AvatarImage
-                  src={employee.user.image ?? undefined}
-                  alt={employee.user.name}
-                />
-
-                <AvatarFallback>
-                  <UserIcon className="size-4 text-muted-foreground" />
-                </AvatarFallback>
-              </Avatar>
-
-              <div className="min-w-0">
-                <p className="truncate font-medium">{employee.user.name}</p>
-
-                <p className="truncate text-sm text-muted-foreground">
-                  {employee.user.email}
-                </p>
-              </div>
+              <UserProfile user={employee.user} title={employee.title || ""}/>
+              <UserNameAndTitle
+                name={employee.user.name}
+                title={employee.title || ""}
+              />
             </div>
           </div>
 

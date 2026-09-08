@@ -7,8 +7,6 @@ import {
   MoreHorizontalIcon,
   Settings2Icon,
   Trash2Icon,
-  User,
-  UserIcon,
 } from "lucide-react";
 
 import {
@@ -51,10 +49,9 @@ import type { OrganizationEmployee } from "@/server/organization/getOrganization
 import { Spinner } from "@/components/ui/spinner";
 import { ManageEmployeeDialog } from "./ManageEmployeeDialog";
 import { titleSchemaInput } from "@/validators/organization/common";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import SharedAvatar from "@/components/shared/SharedAvatar";
-import { getInitials } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
+import { UserProfile } from "../UserProfile";
+import UserNameAndTitle from "@/components/shared/dashboard/UserNameAndTitle";
 
 type Team = {
   id: string;
@@ -169,37 +166,20 @@ const EmployeeTable = ({
                 {/* Employee */}
                 <TableCell>
                   <div className="flex items-center gap-3">
-                    <Avatar className="size-8 shrink-0">
-                      <AvatarImage
-                        src={employee.user.image ?? undefined}
-                        alt={employee.user.name}
-                      />
-
-                      <AvatarFallback>
-                        {getInitials(employee.user.name)}
-                      </AvatarFallback>
-                    </Avatar>
-
-                    <div className="min-w-0">
-                      <p className="truncate font-medium">
-                        {employee.user.name}
-
-                        <span className="ml-2 text-sm text-muted-foreground">
-                          {employee.title ? `(${employee.title})` : ""}
-                        </span>
-                      </p>
-                    </div>
+                    <UserProfile user={employee.user} title={employee.title || ""}/>
+                    <UserNameAndTitle
+                      name={employee.user.name}
+                      title={employee.title || ""}
+                    />
                   </div>
                 </TableCell>
 
                 {/* Contact */}
                 <TableCell>
-                  <div className="flex items-center gap-2">
-                    <MailIcon className="size-3.5 text-muted-foreground" />
+                  <div className="flex items-center gap-2 text-muted-foreground hover:text-primary">
+                    <MailIcon className="size-3.5 " />
 
-                    <span className="text-sm text-muted-foreground">
-                      {employee.user.email}
-                    </span>
+                    <span className="text-sm">{employee.user.email}</span>
                   </div>
                 </TableCell>
 
@@ -311,26 +291,11 @@ const EmployeeTable = ({
           {employeeToRemove && (
             <div className="rounded-lg">
               <div className="flex items-center gap-3">
-                <Avatar className="size-10">
-                  <AvatarImage
-                    src={employeeToRemove.user.image ?? undefined}
-                    alt={employeeToRemove.user.name}
-                  />
-
-                  <AvatarFallback>
-                    <UserIcon className="size-4 text-muted-foreground" />
-                  </AvatarFallback>
-                </Avatar>
-
-                <div className="min-w-0">
-                  <p className="truncate font-medium">
-                    {employeeToRemove.user.name}
-                  </p>
-
-                  <p className="truncate text-sm text-muted-foreground">
-                    {employeeToRemove.user.email}
-                  </p>
-                </div>
+                <UserProfile user={employeeToRemove.user} title={employeeToRemove.title || ""}/>
+                <UserNameAndTitle
+                  name={employeeToRemove.user.name}
+                  title={employeeToRemove.title || ""}
+                />
               </div>
             </div>
           )}

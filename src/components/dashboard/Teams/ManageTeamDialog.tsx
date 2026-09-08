@@ -24,6 +24,7 @@ import { Search, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { updateTeam } from "@/server/team/updateTeam";
+import { getInitials } from "@/lib/utils";
 
 type TeamMember = {
   id: string;
@@ -53,17 +54,6 @@ type ManageTeamDialogProps = {
       adminUserIds: string[];
     },
   ) => void;
-};
-
-const getInitials = (name: string) => {
-  return name
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0))
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
 };
 
 export function ManageTeamDialog({

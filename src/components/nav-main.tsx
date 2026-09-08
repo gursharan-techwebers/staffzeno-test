@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/sidebar";
 import { ChevronRightIcon } from "lucide-react";
 import Link from "next/link";
+import { DashboardLink } from "./dashboard/DashboardLink";
 
 export function NavMain({
   GroupLabel,
@@ -46,10 +47,10 @@ export function NavMain({
             return (
               <SidebarMenuItem key={item.title}>
                 <SidebarMenuButton asChild tooltip={item.title}>
-                  <Link href={item.url}>
+                  <DashboardLink href={item.url}>
                     {item.icon}
                     <span>{item.title}</span>
-                  </Link>
+                  </DashboardLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             );
@@ -77,9 +78,9 @@ export function NavMain({
                     {item.items?.map((subItem) => (
                       <SidebarMenuSubItem key={subItem.title}>
                         <SidebarMenuSubButton asChild>
-                          <Link href={subItem.url}>
+                          <DashboardLink href={subItem.url}>
                             <span>{subItem.title}</span>
-                          </Link>
+                          </DashboardLink>
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem>
                     ))}

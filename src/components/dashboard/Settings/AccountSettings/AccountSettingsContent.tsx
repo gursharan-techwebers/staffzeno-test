@@ -59,7 +59,7 @@ const AccountSettingsContent = ({
           <SecuritySettings
             lastPasswordChangedAt={lastPasswordChangedAt}
             sessions={sessions}
-            hasPassword={user.hasPassword}
+             hasPassword={user.hasPassword}
           />
         </TabsContent>
       </Tabs>
