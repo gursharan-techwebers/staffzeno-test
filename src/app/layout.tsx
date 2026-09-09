@@ -24,12 +24,17 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.className} min-h-full antialiased`}>
       <body>
-        {/* <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange> */}
-        <TooltipProvider>
-          {children}
-          <Toaster />
-        </TooltipProvider>
-        {/* </ThemeProvider> */}
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <TooltipProvider>
+            {children}
+            <Toaster />
+          </TooltipProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
