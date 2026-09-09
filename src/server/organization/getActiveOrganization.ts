@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+
 import { getSession } from "../user/getSession";
 
 export async function getActiveOrganization() {
@@ -23,6 +24,9 @@ export async function getActiveOrganization() {
     select: {
       id: true,
       name: true,
+      email: true,
+      phone: true,
+      address: true,
       logo: true,
       slug: true,
     },

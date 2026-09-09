@@ -286,7 +286,7 @@ const SecuritySettings = ({
 
   return (
     <>
-      <div className="max-w-xl space-y-8">
+      <div className="space-y-8">
         {/* Password */}
 
         {hasPassword && (
@@ -417,18 +417,20 @@ const SecuritySettings = ({
                                 variant={"outline"}
                                 className="text-primary text-xs"
                               >
-                                <CheckCircle2Icon/>
+                                <CheckCircle2Icon />
                                 Current
                               </Badge>
                             )}
                           </div>
 
-                          <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                            {browser && <span>{browser}</span>}
+                          <div className="mt-2 flex flex-col flex-wrap gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                            <div className="flex flex-wrap gap-x-2">
+                              {browser && <span>{browser}</span>}
 
-                            {session.ipAddress && (
-                              <span>{session.ipAddress}</span>
-                            )}
+                              {session.ipAddress && (
+                                <span>{session.ipAddress}</span>
+                              )}
+                            </div>
 
                             <span>
                               Last active - {formatDate(session.updatedAt)}

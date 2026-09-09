@@ -19,8 +19,10 @@ export function DashboardPageHeader({
   className = "",
 }: DashboardPageHeaderProps) {
   return (
-    <div className={`flex items-center justify-between ${className}`}>
-      <div className="flex flex-col gap-1 pb-4">
+    <div
+      className={`flex gap-2 flex-wrap items-center justify-between ${className}`}
+    >
+      <div className="flex flex-col gap-1 mb-2 md:mb-4">
         <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
 
         <p className="text-sm text-muted-foreground">{description}</p>

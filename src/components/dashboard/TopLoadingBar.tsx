@@ -10,9 +10,55 @@ export function TopLoadingBar() {
   const [progress, setProgress] = React.useState(0);
 
   const previousPathname = React.useRef(pathname);
+  const animationFrame = React.useRef<number | null>(null);
 
   /*
-   * Detect when navigation has actually completed.
+   * Smoothly animate progress while navigation is loading.
+   */
+  React.useEffect(() => {
+    if (!loading) {
+      if (animationFrame.current !== null) {
+        cancelAnimationFrame(animationFrame.current);
+        animationFrame.current = null;
+      }
+
+      return;
+    }
+
+    let lastTime = performance.now();
+
+    const animate = (time: number) => {
+      const delta = time - lastTime;
+      lastTime = time;
+
+      setProgress((current) => {
+        if (current >= 90) {
+          return current;
+        }
+
+        const remaining = 90 - current;
+
+        // Progress gets slower as it approaches 90%.
+        const speed = Math.max(0.002, remaining * 0.0008);
+
+        return Math.min(current + speed * delta, 90);
+      });
+
+      animationFrame.current = requestAnimationFrame(animate);
+    };
+
+    animationFrame.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animationFrame.current !== null) {
+        cancelAnimationFrame(animationFrame.current);
+        animationFrame.current = null;
+      }
+    };
+  }, [loading]);
+
+  /*
+   * Detect when navigation has completed.
    */
   React.useEffect(() => {
     if (previousPathname.current === pathname) {
@@ -25,15 +71,20 @@ export function TopLoadingBar() {
       return;
     }
 
-    // Navigation completed.
+    // Finish the progress smoothly.
     setProgress(100);
 
-    const timeout = window.setTimeout(() => {
+    const hideTimeout = window.setTimeout(() => {
       setLoading(false);
-      setProgress(0);
-    }, 200);
 
-    return () => window.clearTimeout(timeout);
+      const resetTimeout = window.setTimeout(() => {
+        setProgress(0);
+      }, 150);
+
+      return () => window.clearTimeout(resetTimeout);
+    }, 350);
+
+    return () => window.clearTimeout(hideTimeout);
   }, [pathname, loading]);
 
   /*
@@ -42,7 +93,12 @@ export function TopLoadingBar() {
   React.useEffect(() => {
     const handleStart = () => {
       setLoading(true);
-      setProgress(10);
+      setProgress(0);
+
+      // Smoothly move away from 0 instead of jumping immediately.
+      requestAnimationFrame(() => {
+        setProgress(12);
+      });
     };
 
     window.addEventListener("staffzeno:navigation-start", handleStart);
@@ -52,42 +108,52 @@ export function TopLoadingBar() {
     };
   }, []);
 
-  /*
-   * While the page is actually loading,
-   * smoothly move toward 90%.
-   */
-  React.useEffect(() => {
-    if (!loading) {
-      return;
-    }
-
-    const interval = window.setInterval(() => {
-      setProgress((current) => {
-        if (current >= 90) {
-          return current;
-        }
-
-        const remaining = 90 - current;
-
-        return current + Math.max(0.5, remaining * 0.08);
-      });
-    }, 200);
-
-    return () => {
-      window.clearInterval(interval);
-    };
-  }, [loading]);
-
-  if (!loading) {
+  if (!loading && progress === 0) {
     return null;
   }
 
   return (
     <div
-      className="fixed inset-x-0 top-0 z-9999 h-0.5 bg-primary transition-[width] duration-200 ease-out"
-      style={{
-        width: `${progress}%`,
-      }}
-    />
+      className="
+        pointer-events-none
+        fixed
+        inset-x-0
+        top-0
+        z-9999
+        h-0.5
+        overflow-hidden
+      "
+    >
+      <div
+        className="
+          relative
+          h-full
+          bg-primary
+          transition-[width]
+          duration-300
+          ease-out
+          shadow-[0_0_8px_var(--primary)]
+        "
+        style={{
+          width: `${progress}%`,
+        }}
+      >
+        {/* Moving highlight */}
+        <div
+          className="
+            absolute
+            inset-y-0
+            right-0
+            w-24
+            translate-x-full
+            animate-[loading-shine_1.4s_ease-in-out_infinite]
+            bg-linear-to-r
+            from-transparent
+            via-white/50
+            to-transparent
+          "
+        />
+      </div>
+    </div>
   );
 }

@@ -114,7 +114,7 @@ const ProfileSettings = ({ user }: ProfileSettingsProps) => {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="max-w-xl space-y-6">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       {/* Profile header */}
 
       <div>

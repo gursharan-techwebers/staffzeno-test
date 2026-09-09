@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -9,6 +11,7 @@ type EmptyStateProps = {
   description: string;
   actionIcon?: React.ReactNode;
   actionLabel?: string;
+  actionHref?: string;
   onAction?: () => void;
 };
 
@@ -18,9 +21,10 @@ const EmptyState = ({
   description,
   actionIcon,
   actionLabel,
+  actionHref,
   onAction,
 }: EmptyStateProps) => {
-  const hasAction = Boolean(actionLabel && onAction);
+  const hasAction = Boolean(actionLabel && (onAction || actionHref));
 
   return (
     <Card className="relative min-h-100 overflow-hidden border">
@@ -48,12 +52,20 @@ const EmptyState = ({
             {description}
           </p>
 
-          {hasAction && (
-            <Button className="mt-5" onClick={onAction}>
-              {actionIcon}
-              {actionLabel}
-            </Button>
-          )}
+          {hasAction &&
+            (actionHref ? (
+              <Button className="mt-5" asChild>
+                <Link href={actionHref}>
+                  {actionIcon}
+                  {actionLabel}
+                </Link>
+              </Button>
+            ) : (
+              <Button className="mt-5" onClick={onAction}>
+                {actionIcon}
+                {actionLabel}
+              </Button>
+            ))}
         </div>
       </div>
     </Card>

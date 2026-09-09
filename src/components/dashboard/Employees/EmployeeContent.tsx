@@ -11,7 +11,7 @@ import { EmployeeTable } from "./EmployeeTable";
 
 import type { OrganizationEmployee } from "@/server/organization/getOrganizationEmployees";
 import type { Invitation } from "@/types/organization/invitation";
-import type { titleSchemaInput } from "@/validators/organization/common";
+import type { TitleSchemaInput } from "@/validators/organization/common";
 
 type Team = {
   id: string;
@@ -67,7 +67,7 @@ const EmployeeContent = ({
     updates: {
       role: "admin" | "member";
       teamId: string | null;
-      title: titleSchemaInput;
+      title: TitleSchemaInput;
     },
   ) => {
     setEmployees((current) =>

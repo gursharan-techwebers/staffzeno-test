@@ -41,7 +41,7 @@ import type { OrganizationEmployee } from "@/server/organization/getOrganization
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 
-import { titleSchemaInput } from "@/validators/organization/common";
+import { TitleSchemaInput } from "@/validators/organization/common";
 import { UserProfile } from "../UserProfile";
 import UserNameAndTitle from "@/components/shared/dashboard/UserNameAndTitle";
 
@@ -63,7 +63,7 @@ type ManageEmployeeDialogProps = {
     updates: {
       role: EmployeeRole;
       teamId: string | null;
-      title: titleSchemaInput;
+      title: TitleSchemaInput;
     },
   ) => void;
 };
@@ -78,7 +78,7 @@ export function ManageEmployeeDialog({
 }: ManageEmployeeDialogProps) {
   const [role, setRole] = useState<EmployeeRole>("member");
 
-  const [title, setTitle] = useState<titleSchemaInput>("");
+  const [title, setTitle] = useState<TitleSchemaInput>("");
 
   const [teamId, setTeamId] = useState<string>("none");
 

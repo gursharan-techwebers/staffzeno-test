@@ -48,7 +48,7 @@ import type { OrganizationEmployee } from "@/server/organization/getOrganization
 
 import { Spinner } from "@/components/ui/spinner";
 import { ManageEmployeeDialog } from "./ManageEmployeeDialog";
-import { titleSchemaInput } from "@/validators/organization/common";
+import { TitleSchemaInput } from "@/validators/organization/common";
 import { Separator } from "@/components/ui/separator";
 import { UserProfile } from "../UserProfile";
 import UserNameAndTitle from "@/components/shared/dashboard/UserNameAndTitle";
@@ -69,7 +69,7 @@ type EmployeeTableProps = {
     updates: {
       role: "admin" | "member";
       teamId: string | null;
-      title: titleSchemaInput;
+      title: TitleSchemaInput;
     },
   ) => void;
 };

@@ -1,9 +1,35 @@
-import React from 'react'
+import { Settings2Icon, WalletCardsIcon } from "lucide-react";
 
-const Payroll = () => {
-  return (
-    <div>Payroll</div>
-  )
-}
+import EmptyState from "@/components/shared/dashboard/EmptyState";
+import { getOrganizationSettingsStatus } from "@/server/organization/getOrganizationSettingsStatus";
 
-export default Payroll
+const Payroll = async () => {
+  const settingsStatus = await getOrganizationSettingsStatus();
+
+  if (!settingsStatus) {
+    return null;
+  }
+
+  if (!settingsStatus.attendance || !settingsStatus.leave) {
+    const missingSetting = !settingsStatus.attendance ? "attendance" : "leave";
+
+    return (
+      <EmptyState
+        icon={<WalletCardsIcon className="size-6 text-muted-foreground" />}
+        title="Payroll setup required"
+        description="Before you can manage payroll, you need to configure your organization's attendance and leave settings."
+        actionIcon={<Settings2Icon className="size-4" />}
+        actionLabel={
+          missingSetting === "attendance"
+            ? "Configure attendance settings"
+            : "Configure leave settings"
+        }
+        actionHref={`/org/${settingsStatus.organizationSlug}/settings?tab=${missingSetting}`}
+      />
+    );
+  }
+
+  return <div>Payroll</div>;
+};
+
+export default Payroll;

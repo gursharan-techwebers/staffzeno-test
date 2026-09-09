@@ -98,7 +98,7 @@ const CreateOrganizationDialog = ({
         description: "Your organization has been created successfully.",
       });
       setRedirecting(true);
-      router.push(`/org/${result.data.slug}`);
+      router.push(`/org/${result.data.slug}/settings`);
     } catch (error) {
       console.error("[CreateOrganizationDialog] error:", error);
 

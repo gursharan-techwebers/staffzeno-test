@@ -98,7 +98,7 @@ export function AppSidebar({
       },
 
       // Owner only
-      ...(role === "owner"
+      ...(isOwnerOrAdmin
         ? [
             {
               title: "Payroll",

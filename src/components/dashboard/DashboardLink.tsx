@@ -2,14 +2,14 @@
 
 import * as React from "react";
 import Link, { type LinkProps } from "next/link";
+import { usePathname } from "next/navigation";
 
 type DashboardLinkProps = LinkProps &
   React.AnchorHTMLAttributes<HTMLAnchorElement>;
 
-export function DashboardLink({
-  onClick,
-  ...props
-}: DashboardLinkProps) {
+export function DashboardLink({ onClick, ...props }: DashboardLinkProps) {
+  const pathname = usePathname();
+
   const handleClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
     onClick?.(event);
 
@@ -30,9 +30,13 @@ export function DashboardLink({
       return;
     }
 
-    window.dispatchEvent(
-      new CustomEvent("staffzeno:navigation-start"),
-    );
+    const targetPathname = target.pathname;
+
+    if (targetPathname === pathname) {
+      return;
+    }
+
+    window.dispatchEvent(new CustomEvent("staffzeno:navigation-start"));
   };
 
   return <Link {...props} onClick={handleClick} />;

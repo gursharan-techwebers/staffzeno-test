@@ -1,8 +1,8 @@
 import z from "zod";
-import { TeamNameSchema } from "./common";
+import { teamNameSchema } from "./common";
 
 export const createTeamSchema = z.object({
-  name: TeamNameSchema,
+  name: teamNameSchema,
 });
 
 export type CreateTeamInput = z.infer<
