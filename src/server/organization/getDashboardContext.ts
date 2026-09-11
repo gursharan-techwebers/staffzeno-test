@@ -40,9 +40,14 @@ export type DashboardContext = {
 
 export const getDashboardContext = cache(
   async (slug: string): Promise<ActionResult<DashboardContext>> => {
+    const totalTimer = `getDashboardContext:total:${slug}`;
+    console.time(totalTimer);
+
     const organizationSlug = slug.trim();
 
     if (!organizationSlug) {
+      console.timeEnd(totalTimer);
+
       return actionResponse(
         ACTION_STATUS.BAD_REQUEST,
         "Organization slug is required.",
@@ -50,10 +55,20 @@ export const getDashboardContext = cache(
       );
     }
 
-    // Get authenticated user/session.
+    // -------------------------------------------------------------------------
+    // Authentication
+    // -------------------------------------------------------------------------
+
+    const authTimer = `getDashboardContext:auth:${organizationSlug}`;
+    console.time(authTimer);
+
     const authContext = await getAuthContext();
 
+    console.timeEnd(authTimer);
+
     if (!authContext) {
+      console.timeEnd(totalTimer);
+
       return actionResponse(
         ACTION_STATUS.UNAUTHORIZED,
         "You must be logged in.",
@@ -63,7 +78,14 @@ export const getDashboardContext = cache(
 
     const { session, user } = authContext;
 
-    // Find organization.
+    // -------------------------------------------------------------------------
+    // Organization
+    // -------------------------------------------------------------------------
+
+    const organizationTimer = `getDashboardContext:organization:${organizationSlug}`;
+
+    console.time(organizationTimer);
+
     const organization = await prisma.organization.findUnique({
       where: {
         slug: organizationSlug,
@@ -76,7 +98,11 @@ export const getDashboardContext = cache(
       },
     });
 
+    console.timeEnd(organizationTimer);
+
     if (!organization) {
+      console.timeEnd(totalTimer);
+
       return actionResponse(
         ACTION_STATUS.NOT_FOUND,
         "Organization not found.",
@@ -84,7 +110,14 @@ export const getDashboardContext = cache(
       );
     }
 
-    // Verify membership and get role.
+    // -------------------------------------------------------------------------
+    // Membership
+    // -------------------------------------------------------------------------
+
+    const membershipTimer = `getDashboardContext:membership:${organizationSlug}`;
+
+    console.time(membershipTimer);
+
     const membership = await prisma.member.findFirst({
       where: {
         organizationId: organization.id,
@@ -96,7 +129,11 @@ export const getDashboardContext = cache(
       },
     });
 
+    console.timeEnd(membershipTimer);
+
     if (!membership) {
+      console.timeEnd(totalTimer);
+
       return actionResponse(
         ACTION_STATUS.FORBIDDEN,
         "You do not have access to this organization.",
@@ -104,7 +141,11 @@ export const getDashboardContext = cache(
       );
     }
 
-    return actionResponse(ACTION_STATUS.OK, {
+    // -------------------------------------------------------------------------
+    // Complete
+    // -------------------------------------------------------------------------
+
+    const result = actionResponse(ACTION_STATUS.OK, {
       session,
       user: {
         id: user.id,
@@ -118,5 +159,9 @@ export const getDashboardContext = cache(
         role: membership.role as OrganizationRole,
       },
     });
+
+    console.timeEnd(totalTimer);
+
+    return result;
   },
 );
