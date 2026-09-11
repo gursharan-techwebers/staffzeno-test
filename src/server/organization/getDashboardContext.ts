@@ -56,15 +56,39 @@ export const getDashboardContext = cache(
     }
 
     // -------------------------------------------------------------------------
-    // Authentication
+    // Authentication + Organization
+    //
+    // These two operations are independent, so run them in parallel.
+    // This removes the previous sequential ~900ms wait.
     // -------------------------------------------------------------------------
 
     const authTimer = `getDashboardContext:auth:${organizationSlug}`;
-    console.time(authTimer);
+    const organizationTimer = `getDashboardContext:organization:${organizationSlug}`;
 
-    const authContext = await getAuthContext();
+    console.time(authTimer);
+    console.time(organizationTimer);
+
+    const [authContext, organization] = await Promise.all([
+      getAuthContext(),
+      prisma.organization.findUnique({
+        where: {
+          slug: organizationSlug,
+        },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          logo: true,
+        },
+      }),
+    ]);
 
     console.timeEnd(authTimer);
+    console.timeEnd(organizationTimer);
+
+    // -------------------------------------------------------------------------
+    // Authentication check
+    // -------------------------------------------------------------------------
 
     if (!authContext) {
       console.timeEnd(totalTimer);
@@ -79,26 +103,8 @@ export const getDashboardContext = cache(
     const { session, user } = authContext;
 
     // -------------------------------------------------------------------------
-    // Organization
+    // Organization check
     // -------------------------------------------------------------------------
-
-    const organizationTimer = `getDashboardContext:organization:${organizationSlug}`;
-
-    console.time(organizationTimer);
-
-    const organization = await prisma.organization.findUnique({
-      where: {
-        slug: organizationSlug,
-      },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        logo: true,
-      },
-    });
-
-    console.timeEnd(organizationTimer);
 
     if (!organization) {
       console.timeEnd(totalTimer);
