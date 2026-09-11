@@ -1,7 +1,5 @@
 "use server";
 
-import "server-only";
-
 import { headers } from "next/headers";
 
 import { auth } from "@/lib/auth";
@@ -10,26 +8,19 @@ import {
   ACTION_STATUS,
   type ActionResult,
 } from "@/lib/actionResponse";
-import { getSession } from "./getSession";
+
+import { getAuthContext } from "../auth/getAuthContext";
 
 export async function revokeAllUserSessions(): Promise<ActionResult<null>> {
-  // --------------------------------------------------
-  // Authentication
-  // --------------------------------------------------
+  const authContext = await getAuthContext();
 
-  const session = await getSession();
-
-  if (!session?.user) {
+  if (!authContext) {
     return actionResponse(
       ACTION_STATUS.UNAUTHORIZED,
       "You must be logged in to revoke sessions.",
       "UNAUTHORIZED",
     );
   }
-
-  // --------------------------------------------------
-  // Revoke all sessions
-  // --------------------------------------------------
 
   try {
     await auth.api.revokeSessions({

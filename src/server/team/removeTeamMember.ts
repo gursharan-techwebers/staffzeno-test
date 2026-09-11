@@ -1,7 +1,5 @@
 "use server";
 
-import { APIError } from "better-auth/api";
-
 import {
   actionResponse,
   ACTION_STATUS,
@@ -9,7 +7,7 @@ import {
 } from "@/lib/actionResponse";
 
 import { prisma } from "@/lib/prisma";
-import { getSession } from "../user/getSession";
+import { getAuthContext } from "../auth/getAuthContext";
 
 type RemoveTeamMemberInput = {
   teamId: string;
@@ -26,12 +24,35 @@ export async function removeTeamMember(
 ): Promise<ActionResult<RemoveTeamMemberSuccess>> {
   try {
     // --------------------------------------------------
-    // 1. Get current session
+    // 1. Validate input
     // --------------------------------------------------
 
-    const session = await getSession();
+    const teamId = input.teamId?.trim();
+    const memberId = input.memberId?.trim();
 
-    if (!session?.user) {
+    if (!teamId) {
+      return actionResponse(
+        ACTION_STATUS.BAD_REQUEST,
+        "Team ID is required.",
+        "BAD_REQUEST",
+      );
+    }
+
+    if (!memberId) {
+      return actionResponse(
+        ACTION_STATUS.BAD_REQUEST,
+        "Member ID is required.",
+        "BAD_REQUEST",
+      );
+    }
+
+    // --------------------------------------------------
+    // 2. Get authenticated user
+    // --------------------------------------------------
+
+    const authContext = await getAuthContext();
+
+    if (!authContext) {
       return actionResponse(
         ACTION_STATUS.UNAUTHORIZED,
         "Please log in to continue.",
@@ -39,13 +60,15 @@ export async function removeTeamMember(
       );
     }
 
+    const { user } = authContext;
+
     // --------------------------------------------------
-    // 2. Get team and derive organization
+    // 3. Get team
     // --------------------------------------------------
 
     const team = await prisma.team.findUnique({
       where: {
-        id: input.teamId,
+        id: teamId,
       },
       select: {
         id: true,
@@ -62,14 +85,13 @@ export async function removeTeamMember(
     }
 
     // --------------------------------------------------
-    // 3. Check current user's membership in the
-    //    team's organization
+    // 4. Verify current user's organization membership
     // --------------------------------------------------
 
     const currentMember = await prisma.member.findFirst({
       where: {
         organizationId: team.organizationId,
-        userId: session.user.id,
+        userId: user.id,
       },
       select: {
         role: true,
@@ -85,13 +107,13 @@ export async function removeTeamMember(
     }
 
     // --------------------------------------------------
-    // 4. Only owner/admin can remove team members
+    // 5. Only owner/admin can remove team members
     // --------------------------------------------------
 
-    const canManageTeam =
-      currentMember.role === "owner" || currentMember.role === "admin";
-
-    if (!canManageTeam) {
+    if (
+      currentMember.role !== "owner" &&
+      currentMember.role !== "admin"
+    ) {
       return actionResponse(
         ACTION_STATUS.FORBIDDEN,
         "You don't have permission to remove team members.",
@@ -100,17 +122,16 @@ export async function removeTeamMember(
     }
 
     // --------------------------------------------------
-    // 5. Find team member
+    // 6. Find team member scoped to this team
     // --------------------------------------------------
 
     const teamMember = await prisma.teamMember.findFirst({
       where: {
-        id: input.memberId,
+        id: memberId,
         teamId: team.id,
       },
       select: {
         id: true,
-        userId: true,
       },
     });
 
@@ -123,31 +144,7 @@ export async function removeTeamMember(
     }
 
     // --------------------------------------------------
-    // 6. Verify the user belongs to the team's
-    //    organization
-    // --------------------------------------------------
-
-    const organizationMember = await prisma.member.findFirst({
-      where: {
-        organizationId: team.organizationId,
-        userId: teamMember.userId,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (!organizationMember) {
-      return actionResponse(
-        ACTION_STATUS.FORBIDDEN,
-        "This team member does not belong to the team's organization.",
-        "FORBIDDEN",
-      );
-    }
-
-    // --------------------------------------------------
-    // 7. Remove TeamMember + decrement memberCount
-    //    atomically
+    // 7. Remove membership + update count atomically
     // --------------------------------------------------
 
     await prisma.$transaction(async (tx) => {
@@ -182,15 +179,10 @@ export async function removeTeamMember(
       "Team member removed successfully.",
     );
   } catch (error) {
-    if (error instanceof APIError) {
-      return actionResponse(
-        ACTION_STATUS.BAD_REQUEST,
-        error.body?.message ?? "Unable to remove team member.",
-        "BAD_REQUEST",
-      );
-    }
-
-    console.error("[removeTeamMember] unexpected error:", error);
+    console.error(
+      "[removeTeamMember] unexpected error:",
+      error,
+    );
 
     return actionResponse(
       ACTION_STATUS.INTERNAL_SERVER_ERROR,

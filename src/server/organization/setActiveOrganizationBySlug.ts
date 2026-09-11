@@ -1,7 +1,5 @@
 "use server";
 
-import "server-only";
-
 import { APIError } from "better-auth/api";
 import { headers } from "next/headers";
 
@@ -13,7 +11,7 @@ import {
 } from "@/lib/actionResponse";
 import { prisma } from "@/lib/prisma";
 
-import { getSession } from "../user/getSession";
+import { getAuthContext } from "../auth/getAuthContext";
 
 type SetActiveOrganizationSuccess = {
   organizationId: string;
@@ -34,12 +32,9 @@ export async function setActiveOrganizationBySlug(
   }
 
   try {
-    const requestHeaders = await headers();
+    const authContext = await getAuthContext();
 
-    // 1. Get current session
-    const session = await getSession();
-
-    if (!session) {
+    if (!authContext) {
       return actionResponse(
         ACTION_STATUS.UNAUTHORIZED,
         "You must be logged in.",
@@ -47,7 +42,9 @@ export async function setActiveOrganizationBySlug(
       );
     }
 
-    // 2. Find organization by slug
+    const { user } = authContext;
+
+    // Find organization
     const organization = await prisma.organization.findUnique({
       where: {
         slug: organizationSlug,
@@ -66,11 +63,11 @@ export async function setActiveOrganizationBySlug(
       );
     }
 
-    // 3. Verify current user belongs to this organization
+    // Verify user belongs to the organization
     const membership = await prisma.member.findFirst({
       where: {
         organizationId: organization.id,
-        userId: session.user.id,
+        userId: user.id,
       },
       select: {
         id: true,
@@ -85,7 +82,9 @@ export async function setActiveOrganizationBySlug(
       );
     }
 
-    // 4. Set active organization
+    // Better Auth needs the request headers to update the active organization
+    const requestHeaders = await headers();
+
     await auth.api.setActiveOrganization({
       body: {
         organizationId: organization.id,
@@ -93,7 +92,6 @@ export async function setActiveOrganizationBySlug(
       headers: requestHeaders,
     });
 
-    // 5. Return success
     return actionResponse(
       ACTION_STATUS.OK,
       {
@@ -103,7 +101,6 @@ export async function setActiveOrganizationBySlug(
       "Organization activated successfully.",
     );
   } catch (error) {
-    // 6. Handle Better Auth errors
     if (error instanceof APIError) {
       console.error("[setActiveOrganizationBySlug] API error:", error);
 
@@ -114,7 +111,6 @@ export async function setActiveOrganizationBySlug(
       );
     }
 
-    // 7. Handle unexpected errors
     console.error("[setActiveOrganizationBySlug] unexpected error:", error);
 
     return actionResponse(

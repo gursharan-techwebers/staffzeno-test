@@ -1,15 +1,49 @@
 import { Settings2Icon, WalletCardsIcon } from "lucide-react";
+import { redirect } from "next/navigation";
 
 import EmptyState from "@/components/shared/dashboard/EmptyState";
+
+import { getDashboardContext } from "@/server/organization/getDashboardContext";
 import { getOrganizationSettingsStatus } from "@/server/organization/getOrganizationSettingsStatus";
 
-const Payroll = async () => {
-  const settingsStatus = await getOrganizationSettingsStatus();
+type Props = {
+  params: Promise<{
+    slug: string;
+  }>;
+};
+
+const Payroll = async ({ params }: Props) => {
+  const { slug } = await params;
+
+  // --------------------------------------------------
+  // Resolve authentication + organization + membership
+  // --------------------------------------------------
+  const dashboard = await getDashboardContext(slug);
+
+  if (!dashboard.success) {
+    if (dashboard.code === "UNAUTHORIZED") {
+      redirect("/login");
+    }
+
+    redirect("/");
+  }
+
+  const { organization } = dashboard.data;
+
+  // --------------------------------------------------
+  // Check organization configuration
+  // --------------------------------------------------
+  const settingsStatus = await getOrganizationSettingsStatus({
+    organizationId: organization.id,
+  });
 
   if (!settingsStatus) {
     return null;
   }
 
+  // --------------------------------------------------
+  // Attendance / leave settings are required
+  // --------------------------------------------------
   if (!settingsStatus.attendance || !settingsStatus.leave) {
     const missingSetting = !settingsStatus.attendance ? "attendance" : "leave";
 
@@ -24,7 +58,7 @@ const Payroll = async () => {
             ? "Configure attendance settings"
             : "Configure leave settings"
         }
-        actionHref={`/org/${settingsStatus.organizationSlug}/settings?tab=${missingSetting}`}
+        actionHref={`/org/${organization.slug}/settings?tab=${missingSetting}`}
       />
     );
   }

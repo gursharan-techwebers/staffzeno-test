@@ -1,32 +1,54 @@
 import { redirect } from "next/navigation";
 
-import { getOrganizationEmployees } from "@/server/organization/getOrganizationEmployees";
-import { getActiveOrganization } from "@/server/organization/getActiveOrganization";
-import { getUserOrganizationRole } from "@/server/organization/getUserOrganizationRole";
-import { getOrganizationTeams } from "@/server/team/getOrganizationTeams";
-
 import EmployeeContent from "@/components/dashboard/Employees/EmployeeContent";
 
-const Employees = async () => {
-  const [employeesResult, organization, roleResult, teams] = await Promise.all([
-    getOrganizationEmployees(),
-    getActiveOrganization(),
-    getUserOrganizationRole(),
-    getOrganizationTeams(),
+import { getDashboardContext } from "@/server/organization/getDashboardContext";
+import { getOrganizationEmployees } from "@/server/organization/getOrganizationEmployees";
+import { getOrganizationTeams } from "@/server/team/getOrganizationTeams";
+
+type Props = {
+  params: Promise<{
+    slug: string;
+  }>;
+};
+
+const Employees = async ({ params }: Props) => {
+  const { slug } = await params;
+
+  // --------------------------------------------------
+  // Resolve authentication + organization + membership
+  // --------------------------------------------------
+  const dashboard = await getDashboardContext(slug);
+
+  if (!dashboard.success) {
+    if (dashboard.code === "UNAUTHORIZED") {
+      redirect("/login");
+    }
+
+    redirect("/");
+  }
+
+  const { organization, membership } = dashboard.data;
+
+  // --------------------------------------------------
+  // Load only the data required by this page
+  // --------------------------------------------------
+  const [employeesResult, teams] = await Promise.all([
+    getOrganizationEmployees({
+      organizationId: organization.id,
+      userRole: membership.role,
+    }),
+
+    getOrganizationTeams({
+      organizationId: organization.id,
+    }),
   ]);
 
   // --------------------------------------------------
-  // Unauthorized / invalid organization
+  // Employee loading failed
   // --------------------------------------------------
-  if (!employeesResult.success || !organization) {
-    redirect(`/org/${organization?.slug ?? ""}`);
-  }
-
-  // --------------------------------------------------
-  // Missing organization role
-  // --------------------------------------------------
-  if (!roleResult.success) {
-    return null;
+  if (!employeesResult.success) {
+    redirect(`/org/${organization.slug}`);
   }
 
   // --------------------------------------------------
@@ -40,7 +62,7 @@ const Employees = async () => {
   const defaultTeamId = employeeTeams.at(-1)?.id;
 
   if (!defaultTeamId) {
-    redirect(`/`);
+    redirect("/");
   }
 
   return (
@@ -48,7 +70,7 @@ const Employees = async () => {
       employees={employeesResult.data}
       teams={employeeTeams}
       organizationId={organization.id}
-      currentUserRole={roleResult.data}
+      currentUserRole={membership.role}
       defaultTeamId={defaultTeamId}
     />
   );

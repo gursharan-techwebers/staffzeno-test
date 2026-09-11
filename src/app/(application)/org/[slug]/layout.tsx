@@ -10,13 +10,13 @@ import {
 
 import { getDashboardContext } from "@/server/organization/getDashboardContext";
 import { getUserOrganizations } from "@/server/organization/getUserOrganizations";
-import { getUserTeams } from "@/server/team/getUserTeams";
-import { getOrganizationTeams } from "@/server/team/getOrganizationTeams";
 
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
+
 import DashboardContentSkeleton from "@/components/dashboard/DashboardContentSkeleton";
 import TopLoadingBar from "@/components/TopLoadingBar";
+import { getSidebarTeams } from "@/server/team/getSidebarTeams";
 
 type Props = {
   children: React.ReactNode;
@@ -28,6 +28,10 @@ type Props = {
 const DashboardLayout = async ({ children, params }: Props) => {
   const { slug } = await params;
 
+  /*
+   * Authentication + organization + membership
+   * are established once here.
+   */
   const dashboard = await getDashboardContext(slug);
 
   if (!dashboard.success) {
@@ -38,26 +42,38 @@ const DashboardLayout = async ({ children, params }: Props) => {
     redirect("/");
   }
 
-  const { session, organization, membership } = dashboard.data;
+  const { session, user, organization, membership } = dashboard.data;
 
   const canManageTeams =
     membership.role === "owner" || membership.role === "admin";
 
+  /*
+   * Only fetch data required by the dashboard shell.
+   *
+   * Sidebar teams should NOT load team members.
+   */
   const [allUserOrganizations, teams] = await Promise.all([
-    getUserOrganizations(),
-    canManageTeams ? getOrganizationTeams() : getUserTeams(),
+    getUserOrganizations({
+      userId: user.id,
+    }),
+
+    getSidebarTeams({
+      organizationId: organization.id,
+      userId: user.id,
+      canManageTeams,
+    }),
   ]);
 
   return (
     <>
       <TopLoadingBar />
-      
+
       <SidebarProvider>
         <AppSidebar
           organization={organization}
           allUserOrganizations={allUserOrganizations}
           organizationSlug={organization.slug}
-          user={session.user}
+          user={user}
           teams={teams}
           role={membership.role}
         />

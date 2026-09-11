@@ -25,6 +25,7 @@ import {
   ChartNoAxesCombinedIcon,
   NetworkIcon,
 } from "lucide-react";
+import { SidebarTeam } from "@/server/team/getSidebarTeams";
 
 type User = {
   name: string;
@@ -59,7 +60,7 @@ type AppSidebarProps = React.ComponentProps<typeof Sidebar> & {
   allUserOrganizations: UserOrganization[];
   organizationSlug: string;
   user: User;
-  teams: Team[];
+  teams: SidebarTeam[];
   role: OrganizationRole;
 };
 

@@ -9,11 +9,18 @@ import {
   ACTION_STATUS,
   type ActionResult,
 } from "@/lib/actionResponse";
+import { prisma } from "@/lib/prisma";
 
-import { getSession } from "../user/getSession";
+import { getAuthContext } from "../auth/getAuthContext";
 
 export async function removeTeam(teamId: string): Promise<ActionResult<null>> {
-  if (!teamId?.trim()) {
+  // --------------------------------------------------
+  // 1. Validate input
+  // --------------------------------------------------
+
+  const normalizedTeamId = teamId?.trim();
+
+  if (!normalizedTeamId) {
     return actionResponse(
       ACTION_STATUS.BAD_REQUEST,
       "Team ID is required.",
@@ -22,12 +29,13 @@ export async function removeTeam(teamId: string): Promise<ActionResult<null>> {
   }
 
   try {
-    const requestHeaders = await headers();
+    // --------------------------------------------------
+    // 2. Get authenticated user
+    // --------------------------------------------------
 
-    // 1. Get current session
-    const session = await getSession();
+    const authContext = await getAuthContext();
 
-    if (!session) {
+    if (!authContext) {
       return actionResponse(
         ACTION_STATUS.UNAUTHORIZED,
         "You must be logged in to remove a team.",
@@ -35,12 +43,15 @@ export async function removeTeam(teamId: string): Promise<ActionResult<null>> {
       );
     }
 
-    // 2. Get active organization
-    const activeOrganization = await auth.api.getFullOrganization({
-      headers: requestHeaders,
-    });
+    const { session, user } = authContext;
 
-    if (!activeOrganization) {
+    // --------------------------------------------------
+    // 3. Get active organization
+    // --------------------------------------------------
+
+    const organizationId = session.activeOrganizationId;
+
+    if (!organizationId) {
       return actionResponse(
         ACTION_STATUS.NOT_FOUND,
         "You must have an active organization.",
@@ -48,10 +59,19 @@ export async function removeTeam(teamId: string): Promise<ActionResult<null>> {
       );
     }
 
-    // 3. Verify current user's membership
-    const currentMember = activeOrganization.members.find(
-      (member) => member.userId === session.user.id,
-    );
+    // --------------------------------------------------
+    // 4. Verify current user's membership + role
+    // --------------------------------------------------
+
+    const currentMember = await prisma.member.findFirst({
+      where: {
+        organizationId,
+        userId: user.id,
+      },
+      select: {
+        role: true,
+      },
+    });
 
     if (!currentMember) {
       return actionResponse(
@@ -61,7 +81,6 @@ export async function removeTeam(teamId: string): Promise<ActionResult<null>> {
       );
     }
 
-    // 4. Only owner and admin can remove teams
     if (currentMember.role !== "owner" && currentMember.role !== "admin") {
       return actionResponse(
         ACTION_STATUS.FORBIDDEN,
@@ -70,8 +89,19 @@ export async function removeTeam(teamId: string): Promise<ActionResult<null>> {
       );
     }
 
-    // 5. Verify team belongs to the active organization
-    const team = activeOrganization.teams.find((team) => team.id === teamId);
+    // --------------------------------------------------
+    // 5. Verify team belongs to active organization
+    // --------------------------------------------------
+
+    const team = await prisma.team.findFirst({
+      where: {
+        id: normalizedTeamId,
+        organizationId,
+      },
+      select: {
+        id: true,
+      },
+    });
 
     if (!team) {
       return actionResponse(
@@ -81,18 +111,29 @@ export async function removeTeam(teamId: string): Promise<ActionResult<null>> {
       );
     }
 
-    // 6. Remove team
+    // --------------------------------------------------
+    // 6. Remove team through Better Auth
+    // --------------------------------------------------
+
+    const requestHeaders = await headers();
+
     await auth.api.removeTeam({
       body: {
-        teamId,
+        teamId: team.id,
       },
       headers: requestHeaders,
     });
 
+    // --------------------------------------------------
     // 7. Return success
+    // --------------------------------------------------
+
     return actionResponse(ACTION_STATUS.OK, null, "Team removed successfully.");
   } catch (error) {
+    // --------------------------------------------------
     // 8. Handle Better Auth errors
+    // --------------------------------------------------
+
     if (error instanceof APIError) {
       return actionResponse(
         ACTION_STATUS.BAD_REQUEST,
@@ -101,7 +142,10 @@ export async function removeTeam(teamId: string): Promise<ActionResult<null>> {
       );
     }
 
+    // --------------------------------------------------
     // 9. Handle unexpected errors
+    // --------------------------------------------------
+
     console.error("[removeTeam] unexpected error:", error);
 
     return actionResponse(

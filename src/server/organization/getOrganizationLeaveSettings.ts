@@ -1,26 +1,23 @@
-"use server";
+import "server-only";
 
 import { prisma } from "@/lib/prisma";
 
-import { getSession } from "../user/getSession";
+type GetOrganizationLeaveSettingsParams = {
+  organizationId: string;
+};
 
-export async function getOrganizationLeaveSettings() {
-  const session = await getSession();
-
-  if (!session) {
-    return null;
-  }
-
-  const organizationId = session.session.activeOrganizationId;
-
+export async function getOrganizationLeaveSettings({
+  organizationId,
+}: GetOrganizationLeaveSettingsParams) {
   if (!organizationId) {
     return null;
   }
 
-  const settings = await prisma.organizationLeaveSettings.findUnique({
+  return prisma.organizationLeaveSettings.findUnique({
     where: {
       organizationId,
     },
+
     select: {
       id: true,
       organizationId: true,
@@ -34,6 +31,4 @@ export async function getOrganizationLeaveSettings() {
       updatedAt: true,
     },
   });
-
-  return settings;
 }

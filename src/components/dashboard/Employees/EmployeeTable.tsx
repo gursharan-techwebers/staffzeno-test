@@ -170,7 +170,7 @@ const EmployeeTable = ({
 
                 {/* Contact */}
                 <TableCell>
-                  <div className="flex items-center gap-2 text-muted-foreground hover:text-primary">
+                  <div className="flex items-center gap-2 text-muted-foreground">
                     <MailIcon className="size-3.5 " />
 
                     <span className="text-sm">{employee.user.email}</span>

@@ -30,8 +30,8 @@ import { getCalendarNonWorkingDates } from "@/lib/calendar/workingDays";
 import AddHolidayDialog from "./AddHolidayDialog";
 import DeleteHolidayDialog from "./DeleteHolidayDialog";
 
-import { OrganizationHoliday } from "@/types/organization/holiday";
 import EditHolidayDialog from "./EditHolidayDialog";
+import { OrganizationHoliday } from "@/types/organization/holiday";
 
 type CalendarContentProps = {
   holidays: OrganizationHoliday[];

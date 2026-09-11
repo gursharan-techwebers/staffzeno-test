@@ -1,4 +1,4 @@
-"use server";
+import "server-only";
 
 import { prisma } from "@/lib/prisma";
 
@@ -15,7 +15,9 @@ type GetInvitationOrganizationSuccess = {
 export async function getInvitationOrganization(
   invitationId: string,
 ): Promise<ActionResult<GetInvitationOrganizationSuccess>> {
-  if (!invitationId?.trim()) {
+  const id = invitationId.trim();
+
+  if (!id) {
     return actionResponse(
       ACTION_STATUS.BAD_REQUEST,
       "Invalid or missing invitation.",
@@ -26,7 +28,7 @@ export async function getInvitationOrganization(
   try {
     const invitation = await prisma.invitation.findUnique({
       where: {
-        id: invitationId,
+        id,
       },
       select: {
         organization: {
@@ -45,13 +47,9 @@ export async function getInvitationOrganization(
       );
     }
 
-    return actionResponse(
-      ACTION_STATUS.OK,
-      {
-        name: invitation.organization.name,
-      },
-      "Organization found successfully.",
-    );
+    return actionResponse(ACTION_STATUS.OK, {
+      name: invitation.organization.name,
+    });
   } catch (error) {
     console.error("[getInvitationOrganization] unexpected error:", error);
 

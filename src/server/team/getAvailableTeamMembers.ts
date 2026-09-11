@@ -7,7 +7,7 @@ import {
 } from "@/lib/actionResponse";
 
 import { prisma } from "@/lib/prisma";
-import { getSession } from "../user/getSession";
+import { getAuthContext } from "../auth/getAuthContext";
 
 export type AvailableTeamMember = {
   id: string;
@@ -28,12 +28,26 @@ export async function getAvailableTeamMembers(
 ): Promise<ActionResult<AvailableTeamMember[]>> {
   try {
     // --------------------------------------------------
-    // 1. Get current session
+    // 1. Validate input
     // --------------------------------------------------
 
-    const session = await getSession();
+    const teamId = input.teamId?.trim();
 
-    if (!session?.user) {
+    if (!teamId) {
+      return actionResponse(
+        ACTION_STATUS.BAD_REQUEST,
+        "Team ID is required.",
+        "BAD_REQUEST",
+      );
+    }
+
+    // --------------------------------------------------
+    // 2. Get authenticated user
+    // --------------------------------------------------
+
+    const authContext = await getAuthContext();
+
+    if (!authContext) {
       return actionResponse(
         ACTION_STATUS.UNAUTHORIZED,
         "Please log in to continue.",
@@ -41,13 +55,15 @@ export async function getAvailableTeamMembers(
       );
     }
 
+    const { user } = authContext;
+
     // --------------------------------------------------
-    // 2. Get team and derive organization from the team
+    // 3. Get team
     // --------------------------------------------------
 
     const team = await prisma.team.findUnique({
       where: {
-        id: input.teamId,
+        id: teamId,
       },
       select: {
         id: true,
@@ -64,14 +80,13 @@ export async function getAvailableTeamMembers(
     }
 
     // --------------------------------------------------
-    // 3. Check current user's membership in the team's
-    //    organization
+    // 4. Verify organization membership + permission
     // --------------------------------------------------
 
     const currentMember = await prisma.member.findFirst({
       where: {
         organizationId: team.organizationId,
-        userId: session.user.id,
+        userId: user.id,
       },
       select: {
         role: true,
@@ -86,14 +101,7 @@ export async function getAvailableTeamMembers(
       );
     }
 
-    // --------------------------------------------------
-    // 4. Only organization owner/admin can manage teams
-    // --------------------------------------------------
-
-    const canManageTeam =
-      currentMember.role === "owner" || currentMember.role === "admin";
-
-    if (!canManageTeam) {
+    if (currentMember.role !== "owner" && currentMember.role !== "admin") {
       return actionResponse(
         ACTION_STATUS.FORBIDDEN,
         "You don't have permission to manage this team.",
@@ -102,7 +110,7 @@ export async function getAvailableTeamMembers(
     }
 
     // --------------------------------------------------
-    // 5. Get users already assigned to this team
+    // 5. Get existing team members
     // --------------------------------------------------
 
     const existingTeamMembers = await prisma.teamMember.findMany({
@@ -117,16 +125,19 @@ export async function getAvailableTeamMembers(
     const existingUserIds = existingTeamMembers.map((member) => member.userId);
 
     // --------------------------------------------------
-    // 6. Get ONLY members from this team's organization
-    //    who are NOT already in this team
+    // 6. Get available organization members
     // --------------------------------------------------
 
     const organizationMembers = await prisma.member.findMany({
       where: {
         organizationId: team.organizationId,
-        userId: {
-          notIn: existingUserIds,
-        },
+        ...(existingUserIds.length > 0
+          ? {
+              userId: {
+                notIn: existingUserIds,
+              },
+            }
+          : {}),
       },
       select: {
         id: true,
@@ -149,7 +160,7 @@ export async function getAvailableTeamMembers(
     });
 
     // --------------------------------------------------
-    // 7. Convert to response shape
+    // 7. Return response
     // --------------------------------------------------
 
     const availableMembers: AvailableTeamMember[] = organizationMembers.map(
@@ -163,10 +174,6 @@ export async function getAvailableTeamMembers(
         title: member.title,
       }),
     );
-
-    // --------------------------------------------------
-    // 8. Return available members
-    // --------------------------------------------------
 
     return actionResponse(
       ACTION_STATUS.OK,

@@ -1,18 +1,16 @@
 import AllTeamsContent from "@/components/dashboard/Teams/AllTeams/allTeamsContent";
-import { getOrganizationTeams } from "@/server/team/getOrganizationTeams";
-import { getUserTeams } from "@/server/team/getUserTeams";
-import { getCurrentUserRole } from "@/server/user/getCurrentUserRole";
+import { getTeamsPageData } from "@/server/team/getTeamsPageData";
 
 const Teams = async () => {
-  const role = await getCurrentUserRole();
+  const data = await getTeamsPageData();
 
-  const canManageTeams = role === "owner" || role === "admin";
+  if (!data) {
+    return null;
+  }
 
-  const teams = canManageTeams
-    ? await getOrganizationTeams()
-    : await getUserTeams();
-
-  return <AllTeamsContent initialTeams={teams} organizationRole={role} />;
+  return (
+    <AllTeamsContent initialTeams={data.teams} organizationRole={data.role} />
+  );
 };
 
 export default Teams;

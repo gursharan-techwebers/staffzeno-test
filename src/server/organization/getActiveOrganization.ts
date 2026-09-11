@@ -1,23 +1,23 @@
-"use server";
+import "server-only";
 
 import { prisma } from "@/lib/prisma";
 
-import { getSession } from "../user/getSession";
+import { getAuthContext } from "../auth/getAuthContext";
 
 export async function getActiveOrganization() {
-  const session = await getSession();
+  const authContext = await getAuthContext();
 
-  if (!session) {
+  if (!authContext) {
     return null;
   }
 
-  const organizationId = session.session.activeOrganizationId;
+  const organizationId = authContext.session.activeOrganizationId;
 
   if (!organizationId) {
     return null;
   }
 
-  const organization = await prisma.organization.findUnique({
+  return prisma.organization.findUnique({
     where: {
       id: organizationId,
     },
@@ -31,6 +31,4 @@ export async function getActiveOrganization() {
       slug: true,
     },
   });
-
-  return organization;
 }

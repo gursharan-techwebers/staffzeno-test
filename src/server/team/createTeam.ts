@@ -9,13 +9,15 @@ import {
   ACTION_STATUS,
   type ActionResult,
 } from "@/lib/actionResponse";
+
 import {
   CreateTeamInput,
   createTeamSchema,
 } from "@/validators/organization/team";
 
 import { canCreateTeam } from "../billing/canCreateTeam";
-import { getSession } from "../user/getSession";
+import { getAuthContext } from "../auth/getAuthContext";
+import { prisma } from "@/lib/prisma";
 
 type CreateTeamSuccess = {
   id: string;
@@ -28,6 +30,10 @@ type CreateTeamSuccess = {
 export async function createTeam(
   input: CreateTeamInput,
 ): Promise<ActionResult<CreateTeamSuccess>> {
+  // --------------------------------------------------
+  // 1. Validate input
+  // --------------------------------------------------
+
   const parsed = createTeamSchema.safeParse(input);
 
   if (!parsed.success) {
@@ -42,12 +48,13 @@ export async function createTeam(
   const { name } = parsed.data;
 
   try {
-    const requestHeaders = await headers();
+    // --------------------------------------------------
+    // 2. Get authenticated user
+    // --------------------------------------------------
 
-    // 1. Get current session
-    const session = await getSession();
+    const authContext = await getAuthContext();
 
-    if (!session) {
+    if (!authContext) {
       return actionResponse(
         ACTION_STATUS.UNAUTHORIZED,
         "You must be logged in to create a team.",
@@ -55,12 +62,16 @@ export async function createTeam(
       );
     }
 
-    // 2. Get active organization
-    const activeOrganization = await auth.api.getFullOrganization({
-      headers: requestHeaders,
-    });
+    const { session, user } = authContext;
 
-    if (!activeOrganization) {
+    // --------------------------------------------------
+    // 3. Get active organization
+    // --------------------------------------------------
+
+    const organizationId =
+      session.activeOrganizationId;
+
+    if (!organizationId) {
       return actionResponse(
         ACTION_STATUS.NOT_FOUND,
         "You must have an active organization to create a team.",
@@ -68,10 +79,19 @@ export async function createTeam(
       );
     }
 
-    // 3. Verify current user's membership
-    const currentMember = activeOrganization.members.find(
-      (member) => member.userId === session.user.id,
-    );
+    // --------------------------------------------------
+    // 4. Verify organization membership + role
+    // --------------------------------------------------
+
+    const currentMember = await prisma.member.findFirst({
+      where: {
+        organizationId,
+        userId: user.id,
+      },
+      select: {
+        role: true,
+      },
+    });
 
     if (!currentMember) {
       return actionResponse(
@@ -81,8 +101,10 @@ export async function createTeam(
       );
     }
 
-    // 4. Only owner and admin can create teams
-    if (currentMember.role !== "owner" && currentMember.role !== "admin") {
+    if (
+      currentMember.role !== "owner" &&
+      currentMember.role !== "admin"
+    ) {
       return actionResponse(
         ACTION_STATUS.FORBIDDEN,
         "You do not have permission to create a team.",
@@ -90,10 +112,13 @@ export async function createTeam(
       );
     }
 
-    // 5. Check team's plan limit
+    // --------------------------------------------------
+    // 5. Check plan limit
+    // --------------------------------------------------
+
     const canCreate = await canCreateTeam(
-      session.user.id,
-      activeOrganization.id,
+      user.id,
+      organizationId,
     );
 
     if (!canCreate) {
@@ -104,11 +129,16 @@ export async function createTeam(
       );
     }
 
-    // 6. Create team
+    // --------------------------------------------------
+    // 6. Create team through Better Auth
+    // --------------------------------------------------
+
+    const requestHeaders = await headers();
+
     const team = await auth.api.createTeam({
       body: {
         name,
-        organizationId: activeOrganization.id,
+        organizationId,
       },
       headers: requestHeaders,
     });
@@ -121,7 +151,10 @@ export async function createTeam(
       );
     }
 
+    // --------------------------------------------------
     // 7. Return success
+    // --------------------------------------------------
+
     return actionResponse(
       ACTION_STATUS.OK,
       {
@@ -134,17 +167,19 @@ export async function createTeam(
       "Team created successfully.",
     );
   } catch (error) {
-    // 8. Handle Better Auth errors
     if (error instanceof APIError) {
       return actionResponse(
         ACTION_STATUS.BAD_REQUEST,
-        error.body?.message ?? "Unable to create the team. Please try again.",
+        error.body?.message ??
+          "Unable to create the team. Please try again.",
         "BAD_REQUEST",
       );
     }
 
-    // 9. Handle unexpected errors
-    console.error("[createTeam] unexpected error:", error);
+    console.error(
+      "[createTeam] unexpected error:",
+      error,
+    );
 
     return actionResponse(
       ACTION_STATUS.INTERNAL_SERVER_ERROR,

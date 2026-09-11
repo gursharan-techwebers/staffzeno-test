@@ -1,15 +1,13 @@
 "use server";
 
-import { headers } from "next/headers";
-
-import { auth } from "@/lib/auth";
 import {
   actionResponse,
   ACTION_STATUS,
   type ActionResult,
 } from "@/lib/actionResponse";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "../user/getSession";
+
+import { getAuthContext } from "../auth/getAuthContext";
 
 type DeleteOrganizationHolidaySuccess = {
   holidayId: string;
@@ -18,13 +16,21 @@ type DeleteOrganizationHolidaySuccess = {
 export async function deleteOrganizationHoliday(
   holidayId: string,
 ): Promise<ActionResult<DeleteOrganizationHolidaySuccess>> {
+  const normalizedHolidayId = holidayId?.trim();
+
+  if (!normalizedHolidayId) {
+    return actionResponse(
+      ACTION_STATUS.BAD_REQUEST,
+      "Holiday ID is required.",
+      "BAD_REQUEST",
+    );
+  }
+
   try {
-    const requestHeaders = await headers();
+    // 1. Authenticate current user
+    const authContext = await getAuthContext();
 
-    // 1. Check authentication
-    const session = await getSession();
-
-    if (!session?.user) {
+    if (!authContext) {
       return actionResponse(
         ACTION_STATUS.UNAUTHORIZED,
         "You must be logged in to delete an organization holiday.",
@@ -32,12 +38,12 @@ export async function deleteOrganizationHoliday(
       );
     }
 
-    // 2. Get active organization
-    const activeMember = await auth.api.getActiveMember({
-      headers: requestHeaders,
-    });
+    const { session, user } = authContext;
 
-    if (!activeMember) {
+    // 2. Get active organization
+    const organizationId = session.activeOrganizationId;
+
+    if (!organizationId) {
       return actionResponse(
         ACTION_STATUS.FORBIDDEN,
         "You must have an active organization to delete a holiday.",
@@ -45,10 +51,26 @@ export async function deleteOrganizationHoliday(
       );
     }
 
-    const organizationId = activeMember.organizationId;
+    // 3. Verify current user's membership and permissions
+    const currentMember = await prisma.member.findFirst({
+      where: {
+        organizationId,
+        userId: user.id,
+      },
+      select: {
+        role: true,
+      },
+    });
 
-    // 3. Only owner/admin can delete holidays
-    if (activeMember.role !== "owner" && activeMember.role !== "admin") {
+    if (!currentMember) {
+      return actionResponse(
+        ACTION_STATUS.FORBIDDEN,
+        "You do not have access to this organization.",
+        "FORBIDDEN",
+      );
+    }
+
+    if (currentMember.role !== "owner" && currentMember.role !== "admin") {
       return actionResponse(
         ACTION_STATUS.FORBIDDEN,
         "Only organization owners and admins can delete holidays.",
@@ -56,10 +78,10 @@ export async function deleteOrganizationHoliday(
       );
     }
 
-    // 4. Find holiday belonging to active organization
+    // 4. Find holiday scoped to the active organization
     const holiday = await prisma.organizationHoliday.findFirst({
       where: {
-        id: holidayId,
+        id: normalizedHolidayId,
         organizationId,
       },
       select: {
@@ -82,7 +104,7 @@ export async function deleteOrganizationHoliday(
       },
     });
 
-    // 6. Return success
+    // 6. Return minimal success response
     return actionResponse(
       ACTION_STATUS.OK,
       {

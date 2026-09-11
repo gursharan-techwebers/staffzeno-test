@@ -14,8 +14,9 @@ import {
   CreateOrganizationInput,
   createOrganizationSchema,
 } from "@/validators/organization/organization";
-import { getSession } from "../user/getSession";
+
 import { canCreateOrganization } from "../billing/canCreateOrganization";
+import { getAuthContext } from "../auth/getAuthContext";
 
 type CreateOrganizationSuccess = {
   organizationId: string;
@@ -41,12 +42,12 @@ export async function createOrganization(
   const { name } = parsed.data;
 
   try {
-    const requestHeaders = await headers();
+    // --------------------------------------------------
+    // 1. Authentication
+    // --------------------------------------------------
+    const authContext = await getAuthContext();
 
-    // 1. Check authentication
-    const session = await getSession();
-
-    if (!session) {
+    if (!authContext) {
       return actionResponse(
         ACTION_STATUS.UNAUTHORIZED,
         "You must be logged in to create an organization.",
@@ -54,8 +55,12 @@ export async function createOrganization(
       );
     }
 
+    const { user } = authContext;
+
+    // --------------------------------------------------
     // 2. Check organization limit
-    const canCreate = await canCreateOrganization(session.user.id);
+    // --------------------------------------------------
+    const canCreate = await canCreateOrganization(user.id);
 
     if (!canCreate) {
       return actionResponse(
@@ -65,16 +70,25 @@ export async function createOrganization(
       );
     }
 
+    // --------------------------------------------------
     // 3. Generate organization slug
+    // --------------------------------------------------
     const slug = generateOrganizationSlug();
 
-    // 4. Create organization
+    // --------------------------------------------------
+    // 4. Request headers
+    // --------------------------------------------------
+    const requestHeaders = await headers();
+
+    // --------------------------------------------------
+    // 5. Create organization
+    // --------------------------------------------------
     const organization = await auth.api.createOrganization({
       body: {
         name,
         slug,
-        userId: session.user.id,
-        createdById: session.user.id,
+        userId: user.id,
+        createdById: user.id,
         keepCurrentActiveOrganization: true,
       },
       headers: requestHeaders,
@@ -88,7 +102,9 @@ export async function createOrganization(
       );
     }
 
-    // 5. Set newly created organization as active
+    // --------------------------------------------------
+    // 6. Set newly created organization as active
+    // --------------------------------------------------
     await auth.api.setActiveOrganization({
       body: {
         organizationId: organization.id,
@@ -96,6 +112,9 @@ export async function createOrganization(
       headers: requestHeaders,
     });
 
+    // --------------------------------------------------
+    // 7. Return success
+    // --------------------------------------------------
     return actionResponse(
       ACTION_STATUS.CREATED,
       {

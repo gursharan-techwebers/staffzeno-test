@@ -1,7 +1,5 @@
 "use server";
 
-import "server-only";
-
 import { APIError } from "better-auth/api";
 import { headers } from "next/headers";
 
@@ -12,7 +10,7 @@ import {
   type ActionResult,
 } from "@/lib/actionResponse";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "../user/getSession";
+import { getAuthContext } from "../auth/getAuthContext";
 
 type CancelInvitationSuccess = {
   invitationId: string;
@@ -21,7 +19,9 @@ type CancelInvitationSuccess = {
 export async function cancelInvitation(
   invitationId: string,
 ): Promise<ActionResult<CancelInvitationSuccess>> {
-  if (!invitationId?.trim()) {
+  const normalizedInvitationId = invitationId?.trim();
+
+  if (!normalizedInvitationId) {
     return actionResponse(
       ACTION_STATUS.BAD_REQUEST,
       "Invitation ID is required.",
@@ -30,12 +30,10 @@ export async function cancelInvitation(
   }
 
   try {
-    const requestHeaders = await headers();
+    // 1. Authenticate
+    const authContext = await getAuthContext();
 
-    // 1. Check authentication
-    const session = await getSession();
-
-    if (!session) {
+    if (!authContext) {
       return actionResponse(
         ACTION_STATUS.UNAUTHORIZED,
         "You must be logged in.",
@@ -43,20 +41,39 @@ export async function cancelInvitation(
       );
     }
 
-    // 2. Get active organization member
-    const member = await auth.api.getActiveMember({
-      headers: requestHeaders,
+    const { session, user } = authContext;
+
+    // 2. Get active organization
+    const organizationId = session.activeOrganizationId;
+
+    if (!organizationId) {
+      return actionResponse(
+        ACTION_STATUS.FORBIDDEN,
+        "You must have an active organization.",
+        "FORBIDDEN",
+      );
+    }
+
+    // 3. Verify organization membership and role
+    const member = await prisma.member.findFirst({
+      where: {
+        organizationId,
+        userId: user.id,
+      },
+      select: {
+        role: true,
+      },
     });
 
     if (!member) {
       return actionResponse(
         ACTION_STATUS.FORBIDDEN,
-        "You are not a member of an active organization.",
+        "You are not a member of this organization.",
         "FORBIDDEN",
       );
     }
 
-    // 3. Only owner and admin can manage invitations
+    // 4. Only owner and admin can manage invitations
     const isOwnerOrAdmin = member.role === "owner" || member.role === "admin";
 
     if (!isOwnerOrAdmin) {
@@ -67,11 +84,11 @@ export async function cancelInvitation(
       );
     }
 
-    // 4. Make sure invitation belongs to active organization
+    // 5. Make sure invitation belongs to active organization
     const invitation = await prisma.invitation.findFirst({
       where: {
-        id: invitationId,
-        organizationId: member.organizationId,
+        id: normalizedInvitationId,
+        organizationId,
       },
       select: {
         id: true,
@@ -87,7 +104,7 @@ export async function cancelInvitation(
       );
     }
 
-    // 5. Only pending invitations can be cancelled
+    // 6. Only pending invitations can be cancelled
     if (invitation.status !== "pending") {
       return actionResponse(
         ACTION_STATUS.CONFLICT,
@@ -96,7 +113,9 @@ export async function cancelInvitation(
       );
     }
 
-    // 6. Cancel using Better Auth
+    // 7. Cancel using Better Auth
+    const requestHeaders = await headers();
+
     await auth.api.cancelInvitation({
       body: {
         invitationId: invitation.id,

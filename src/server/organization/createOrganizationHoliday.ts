@@ -1,15 +1,12 @@
 "use server";
 
-import { headers } from "next/headers";
-
-import { auth } from "@/lib/auth";
 import {
   actionResponse,
   ACTION_STATUS,
   type ActionResult,
 } from "@/lib/actionResponse";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "../user/getSession";
+import { getAuthContext } from "../auth/getAuthContext";
 import {
   CreateOrganizationHolidayInput,
   createOrganizationHolidaySchema,
@@ -41,12 +38,10 @@ export async function createOrganizationHoliday(
   const { name, date, description } = parsed.data;
 
   try {
-    const requestHeaders = await headers();
+    // 2. Authenticate
+    const authContext = await getAuthContext();
 
-    // 2. Check authentication
-    const session = await getSession();
-
-    if (!session?.user) {
+    if (!authContext) {
       return actionResponse(
         ACTION_STATUS.UNAUTHORIZED,
         "You must be logged in to add an organization holiday.",
@@ -54,12 +49,12 @@ export async function createOrganizationHoliday(
       );
     }
 
-    // 3. Get active organization membership
-    const activeMember = await auth.api.getActiveMember({
-      headers: requestHeaders,
-    });
+    const { session, user } = authContext;
 
-    if (!activeMember) {
+    // 3. Get active organization
+    const organizationId = session.activeOrganizationId;
+
+    if (!organizationId) {
       return actionResponse(
         ACTION_STATUS.FORBIDDEN,
         "You must have an active organization to add a holiday.",
@@ -67,10 +62,27 @@ export async function createOrganizationHoliday(
       );
     }
 
-    const organizationId = activeMember.organizationId;
+    // 4. Verify organization membership and role
+    const member = await prisma.member.findFirst({
+      where: {
+        organizationId,
+        userId: user.id,
+      },
+      select: {
+        role: true,
+      },
+    });
 
-    // 4. Only owner/admin can add holidays
-    if (activeMember.role !== "owner" && activeMember.role !== "admin") {
+    if (!member) {
+      return actionResponse(
+        ACTION_STATUS.FORBIDDEN,
+        "You are not a member of this organization.",
+        "FORBIDDEN",
+      );
+    }
+
+    // 5. Only owner/admin can add holidays
+    if (member.role !== "owner" && member.role !== "admin") {
       return actionResponse(
         ACTION_STATUS.FORBIDDEN,
         "Only organization owners and admins can add holidays.",
@@ -78,28 +90,10 @@ export async function createOrganizationHoliday(
       );
     }
 
-    // 5. Make sure organization exists
-    const organization = await prisma.organization.findUnique({
-      where: {
-        id: organizationId,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (!organization) {
-      return actionResponse(
-        ACTION_STATUS.NOT_FOUND,
-        "Organization not found.",
-        "ORGANIZATION_NOT_FOUND",
-      );
-    }
-
     // 6. Normalize the date
     const holidayDate = new Date(date);
 
-    // 7. Check if a holiday already exists on this date
+    // 7. Check for an existing holiday on this date
     const existingHoliday = await prisma.organizationHoliday.findUnique({
       where: {
         organizationId_date: {

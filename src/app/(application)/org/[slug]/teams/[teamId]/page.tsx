@@ -1,9 +1,9 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import TeamContent from "@/components/dashboard/Teams/IndividualTeam/TeamContent";
+
+import { getDashboardContext } from "@/server/organization/getDashboardContext";
 import { getTeamFromId } from "@/server/team/getTeamFromId";
-import { getCurrentUserRole } from "@/server/user/getCurrentUserRole";
-import { getSession } from "@/server/user/getSession";
 
 type Props = {
   params: Promise<{
@@ -13,27 +13,34 @@ type Props = {
 };
 
 const Team = async ({ params }: Props) => {
-  const { teamId } = await params;
+  const { slug, teamId } = await params;
 
-  const session = await getSession();
+  const dashboard = await getDashboardContext(slug);
 
-  if (!session?.user) {
+  if (!dashboard.success) {
+    if (dashboard.code === "UNAUTHORIZED") {
+      redirect("/login");
+    }
+
     notFound();
   }
 
-  const team = await getTeamFromId(teamId);
+  const { organization, user, membership } = dashboard.data;
+
+  const team = await getTeamFromId({
+    teamId,
+    organizationId: organization.id,
+  });
 
   if (!team) {
     notFound();
   }
 
-  const organizationRole = await getCurrentUserRole();
-
   const isOrganizationAdmin =
-    organizationRole === "owner" || organizationRole === "admin";
+    membership.role === "owner" || membership.role === "admin";
 
   const currentUserTeamMember = team.members.find(
-    (member) => member.userId === session.user.id,
+    (member) => member.userId === user.id,
   );
 
   // Only organization owner/admin can manage teams.

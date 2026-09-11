@@ -1,7 +1,5 @@
 "use server";
 
-import { APIError } from "better-auth/api";
-
 import {
   actionResponse,
   ACTION_STATUS,
@@ -9,7 +7,7 @@ import {
 } from "@/lib/actionResponse";
 import { prisma } from "@/lib/prisma";
 
-import { getSession } from "../user/getSession";
+import { getAuthContext } from "../auth/getAuthContext";
 
 type AddTeamMembersInput = {
   teamId: string;
@@ -39,21 +37,23 @@ export async function addTeamMembers(
 ): Promise<ActionResult<AddTeamMembersSuccess>> {
   try {
     // --------------------------------------------------
-    // 1. Get current session
+    // 1. Validate input
     // --------------------------------------------------
 
-    const session = await getSession();
+    const teamId = input.teamId?.trim();
+    const memberIds = [
+      ...new Set(
+        (input.memberIds ?? []).map((id) => id.trim()).filter(Boolean),
+      ),
+    ];
 
-    if (!session?.user) {
+    if (!teamId) {
       return actionResponse(
-        ACTION_STATUS.UNAUTHORIZED,
-        "Please log in to continue.",
-        "UNAUTHORIZED",
+        ACTION_STATUS.BAD_REQUEST,
+        "Team ID is required.",
+        "BAD_REQUEST",
       );
     }
-
-    // Remove duplicate member IDs
-    const memberIds = [...new Set(input.memberIds)];
 
     if (memberIds.length === 0) {
       return actionResponse(
@@ -64,12 +64,28 @@ export async function addTeamMembers(
     }
 
     // --------------------------------------------------
-    // 2. Get the team and derive its organization
+    // 2. Get authenticated user
+    // --------------------------------------------------
+
+    const authContext = await getAuthContext();
+
+    if (!authContext) {
+      return actionResponse(
+        ACTION_STATUS.UNAUTHORIZED,
+        "Please log in to continue.",
+        "UNAUTHORIZED",
+      );
+    }
+
+    const { user } = authContext;
+
+    // --------------------------------------------------
+    // 3. Get team
     // --------------------------------------------------
 
     const team = await prisma.team.findUnique({
       where: {
-        id: input.teamId,
+        id: teamId,
       },
       select: {
         id: true,
@@ -86,14 +102,13 @@ export async function addTeamMembers(
     }
 
     // --------------------------------------------------
-    // 3. Check current user's membership in the
-    //    team's organization
+    // 4. Verify current user's organization membership
     // --------------------------------------------------
 
     const currentMember = await prisma.member.findFirst({
       where: {
         organizationId: team.organizationId,
-        userId: session.user.id,
+        userId: user.id,
       },
       select: {
         role: true,
@@ -109,14 +124,10 @@ export async function addTeamMembers(
     }
 
     // --------------------------------------------------
-    // 4. Only organization owner/admin can add members
+    // 5. Only owner/admin can add team members
     // --------------------------------------------------
 
-    const canManageTeam =
-      currentMember.role === "owner" ||
-      currentMember.role === "admin";
-
-    if (!canManageTeam) {
+    if (currentMember.role !== "owner" && currentMember.role !== "admin") {
       return actionResponse(
         ACTION_STATUS.FORBIDDEN,
         "You don't have permission to add team members.",
@@ -125,7 +136,7 @@ export async function addTeamMembers(
     }
 
     // --------------------------------------------------
-    // 5. Get the selected members from THIS organization
+    // 6. Get selected organization members
     // --------------------------------------------------
 
     const organizationMembers = await prisma.member.findMany({
@@ -142,7 +153,7 @@ export async function addTeamMembers(
       },
     });
 
-    // Every selected member must belong to this organization
+    // Every selected member must belong to this organization.
     if (organizationMembers.length !== memberIds.length) {
       return actionResponse(
         ACTION_STATUS.BAD_REQUEST,
@@ -152,39 +163,29 @@ export async function addTeamMembers(
     }
 
     // --------------------------------------------------
-    // 6. Check which selected users are already in team
+    // 7. Find users already in the team
     // --------------------------------------------------
 
-    const selectedUserIds = organizationMembers.map(
-      (member) => member.userId,
-    );
+    const selectedUserIds = organizationMembers.map((member) => member.userId);
 
-    const existingTeamMembers =
-      await prisma.teamMember.findMany({
-        where: {
-          teamId: team.id,
-          userId: {
-            in: selectedUserIds,
-          },
+    const existingTeamMembers = await prisma.teamMember.findMany({
+      where: {
+        teamId: team.id,
+        userId: {
+          in: selectedUserIds,
         },
-        select: {
-          userId: true,
-        },
-      });
+      },
+      select: {
+        userId: true,
+      },
+    });
 
     const existingUserIds = new Set(
-      existingTeamMembers.map(
-        (member) => member.userId,
-      ),
+      existingTeamMembers.map((member) => member.userId),
     );
 
-    // --------------------------------------------------
-    // 7. Only add users who aren't already in team
-    // --------------------------------------------------
-
     const membersToAdd = organizationMembers.filter(
-      (member) =>
-        !existingUserIds.has(member.userId),
+      (member) => !existingUserIds.has(member.userId),
     );
 
     if (membersToAdd.length === 0) {
@@ -196,8 +197,7 @@ export async function addTeamMembers(
     }
 
     // --------------------------------------------------
-    // 8. Create TeamMember records + update count
-    //    atomically
+    // 8. Create team memberships atomically
     // --------------------------------------------------
 
     await prisma.$transaction(async (tx) => {
@@ -224,65 +224,54 @@ export async function addTeamMembers(
     });
 
     // --------------------------------------------------
-    // 9. Fetch the newly created team members
+    // 9. Fetch newly added members
     // --------------------------------------------------
 
-    const addedMembers =
-      await prisma.teamMember.findMany({
-        where: {
-          teamId: team.id,
-          userId: {
-            in: membersToAdd.map(
-              (member) => member.userId,
-            ),
+    const addedMembers = await prisma.teamMember.findMany({
+      where: {
+        teamId: team.id,
+        userId: {
+          in: membersToAdd.map((member) => member.userId),
+        },
+      },
+      select: {
+        id: true,
+        userId: true,
+        teamId: true,
+        role: true,
+        createdAt: true,
+        user: {
+          select: {
+            name: true,
+            email: true,
+            image: true,
           },
         },
-        select: {
-          id: true,
-          userId: true,
-          teamId: true,
-          role: true,
-          createdAt: true,
-
-          user: {
-            select: {
-              name: true,
-              email: true,
-              image: true,
-            },
-          },
-        },
-      });
+      },
+    });
 
     // --------------------------------------------------
-    // 10. Convert to TeamMember shape expected by UI
+    // 10. Build response
     // --------------------------------------------------
 
-    const members: AddedTeamMember[] =
-      addedMembers.map((member) => {
-        const organizationMember =
-          organizationMembers.find(
-            (orgMember) =>
-              orgMember.userId === member.userId,
-          );
+    const titleByUserId = new Map(
+      organizationMembers.map((member) => [member.userId, member.title]),
+    );
 
-        return {
-          id: member.id,
-          userId: member.userId,
-          teamId: member.teamId,
-          role: member.role,
-          title:
-            organizationMember?.title ?? null,
-          createdAt: member.createdAt,
-
-          name: member.user.name,
-          email: member.user.email,
-          image: member.user.image,
-        };
-      });
+    const members: AddedTeamMember[] = addedMembers.map((member) => ({
+      id: member.id,
+      userId: member.userId,
+      teamId: member.teamId,
+      role: member.role as "admin" | "member",
+      title: titleByUserId.get(member.userId) ?? null,
+      createdAt: member.createdAt,
+      name: member.user.name,
+      email: member.user.email,
+      image: member.user.image,
+    }));
 
     // --------------------------------------------------
-    // 11. Return created members
+    // 11. Return success
     // --------------------------------------------------
 
     return actionResponse(
@@ -297,27 +286,7 @@ export async function addTeamMembers(
       } added to the team.`,
     );
   } catch (error) {
-    // --------------------------------------------------
-    // 12. Handle Better Auth errors
-    // --------------------------------------------------
-
-    if (error instanceof APIError) {
-      return actionResponse(
-        ACTION_STATUS.BAD_REQUEST,
-        error.body?.message ??
-          "Unable to add team members.",
-        "BAD_REQUEST",
-      );
-    }
-
-    // --------------------------------------------------
-    // 13. Handle unexpected errors
-    // --------------------------------------------------
-
-    console.error(
-      "[addTeamMembers] unexpected error:",
-      error,
-    );
+    console.error("[addTeamMembers] unexpected error:", error);
 
     return actionResponse(
       ACTION_STATUS.INTERNAL_SERVER_ERROR,

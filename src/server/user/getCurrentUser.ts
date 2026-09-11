@@ -1,28 +1,23 @@
-"use server";
-
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
+import { getAuthContext } from "@/server/auth/getAuthContext";
 
-import { getSession } from "./getSession";
+export async function getAccountSettingsUser() {
+  const authContext = await getAuthContext();
 
-export async function getCurrentUser() {
-  const session = await getSession();
-
-  if (!session?.user) {
+  if (!authContext) {
     return null;
   }
 
-  const user = await prisma.user.findUnique({
+  const { user } = authContext;
+
+  const accountData = await prisma.user.findUnique({
     where: {
-      id: session.user.id,
+      id: user.id,
     },
     select: {
-      id: true,
-      name: true,
-      email: true,
       phone: true,
-      image: true,
       lastPasswordChangedAt: true,
       accounts: {
         where: {
@@ -38,7 +33,7 @@ export async function getCurrentUser() {
     },
   });
 
-  if (!user) {
+  if (!accountData) {
     return null;
   }
 
@@ -46,9 +41,9 @@ export async function getCurrentUser() {
     id: user.id,
     name: user.name,
     email: user.email,
-    phone: user.phone,
+    phone: accountData.phone,
     image: user.image,
-    lastPasswordChangedAt: user.lastPasswordChangedAt,
-    hasPassword: user.accounts.length > 0,
+    lastPasswordChangedAt: accountData.lastPasswordChangedAt,
+    hasPassword: accountData.accounts.length > 0,
   };
 }

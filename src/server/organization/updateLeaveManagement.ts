@@ -1,8 +1,5 @@
 "use server";
 
-import { headers } from "next/headers";
-
-import { auth } from "@/lib/auth";
 import {
   actionResponse,
   ACTION_STATUS,
@@ -15,7 +12,7 @@ import {
   type UpdateLeaveManagementInput,
 } from "@/validators/organization/settings/leave";
 
-import { getSession } from "../user/getSession";
+import { getAuthContext } from "../auth/getAuthContext";
 
 type UpdatedLeaveManagementSettings = {
   id: string;
@@ -33,16 +30,25 @@ type UpdatedLeaveManagementSettings = {
 export async function updateLeaveManagement(
   values: UpdateLeaveManagementInput,
 ): Promise<ActionResult<UpdatedLeaveManagementSettings>> {
+  // 1. Validate input first
+  const validation = updateLeaveManagementSchema.safeParse(values);
+
+  if (!validation.success) {
+    return actionResponse(
+      ACTION_STATUS.VALIDATION_ERROR,
+      "Please correct the highlighted fields.",
+      "VALIDATION_ERROR",
+      validation.error.flatten().fieldErrors,
+    );
+  }
+
+  const data = validation.data;
+
   try {
-    // --------------------------------------------------
-    // 1. Get current session
-    // --------------------------------------------------
+    // 2. Get authenticated user/session
+    const authContext = await getAuthContext();
 
-    const requestHeaders = await headers();
-
-    const session = await getSession();
-
-    if (!session?.user) {
+    if (!authContext) {
       return actionResponse(
         ACTION_STATUS.UNAUTHORIZED,
         "You must be logged in.",
@@ -50,15 +56,12 @@ export async function updateLeaveManagement(
       );
     }
 
-    // --------------------------------------------------
-    // 2. Get active organization member
-    // --------------------------------------------------
+    const { session, user } = authContext;
 
-    const activeMember = await auth.api.getActiveMember({
-      headers: requestHeaders,
-    });
+    // 3. Get active organization from session
+    const organizationId = session.activeOrganizationId;
 
-    if (!activeMember) {
+    if (!organizationId) {
       return actionResponse(
         ACTION_STATUS.NOT_FOUND,
         "No active organization found.",
@@ -66,16 +69,26 @@ export async function updateLeaveManagement(
       );
     }
 
-    const organizationId = activeMember.organizationId;
+    // 4. Verify organization membership + permission
+    const member = await prisma.member.findFirst({
+      where: {
+        organizationId,
+        userId: user.id,
+      },
+      select: {
+        role: true,
+      },
+    });
 
-    // --------------------------------------------------
-    // 3. Check organization permission
-    // --------------------------------------------------
+    if (!member) {
+      return actionResponse(
+        ACTION_STATUS.FORBIDDEN,
+        "You do not have access to this organization.",
+        "FORBIDDEN",
+      );
+    }
 
-    if (
-      activeMember.role !== "owner" &&
-      activeMember.role !== "admin"
-    ) {
+    if (member.role !== "owner" && member.role !== "admin") {
       return actionResponse(
         ACTION_STATUS.FORBIDDEN,
         "Only organization admins and owners can update leave settings.",
@@ -83,102 +96,54 @@ export async function updateLeaveManagement(
       );
     }
 
-    // --------------------------------------------------
-    // 4. Validate input
-    // --------------------------------------------------
-
-    const validation = updateLeaveManagementSchema.safeParse(values);
-
-    if (!validation.success) {
-      return actionResponse(
-        ACTION_STATUS.VALIDATION_ERROR,
-        "Please correct the highlighted fields.",
-        "VALIDATION_ERROR",
-        validation.error.flatten().fieldErrors,
-      );
-    }
-
-    const data = validation.data;
-
-    // --------------------------------------------------
-    // 5. Check organization exists
-    // --------------------------------------------------
-
-    const organization = await prisma.organization.findUnique({
+    // 5. Create or update leave settings
+    const updatedSettings = await prisma.organizationLeaveSettings.upsert({
       where: {
-        id: organizationId,
+        organizationId,
       },
+
+      update: {
+        monthlyPaidLeaves: data.monthlyPaidLeaves,
+        monthlyPaidHalfDayLeaves: data.monthlyPaidHalfDayLeaves,
+        monthlyPaidShortLeaves: data.monthlyPaidShortLeaves,
+        shortLeaveDuration: data.shortLeaveDuration,
+        carryForwardEnabled: data.carryForwardEnabled,
+        leaveEncashmentEnabled: data.leaveEncashmentEnabled,
+      },
+
+      create: {
+        id: crypto.randomUUID(),
+        organizationId,
+        monthlyPaidLeaves: data.monthlyPaidLeaves,
+        monthlyPaidHalfDayLeaves: data.monthlyPaidHalfDayLeaves,
+        monthlyPaidShortLeaves: data.monthlyPaidShortLeaves,
+        shortLeaveDuration: data.shortLeaveDuration,
+        carryForwardEnabled: data.carryForwardEnabled,
+        leaveEncashmentEnabled: data.leaveEncashmentEnabled,
+      },
+
       select: {
         id: true,
+        organizationId: true,
+        monthlyPaidLeaves: true,
+        monthlyPaidHalfDayLeaves: true,
+        monthlyPaidShortLeaves: true,
+        shortLeaveDuration: true,
+        carryForwardEnabled: true,
+        leaveEncashmentEnabled: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
 
-    if (!organization) {
-      return actionResponse(
-        ACTION_STATUS.NOT_FOUND,
-        "Organization not found.",
-        "ORGANIZATION_NOT_FOUND",
-      );
-    }
-
-    // --------------------------------------------------
-    // 6. Create or update leave settings
-    // --------------------------------------------------
-
-    const updatedSettings =
-      await prisma.organizationLeaveSettings.upsert({
-        where: {
-          organizationId,
-        },
-
-        update: {
-          monthlyPaidLeaves: data.monthlyPaidLeaves,
-          monthlyPaidHalfDayLeaves: data.monthlyPaidHalfDayLeaves,
-          monthlyPaidShortLeaves: data.monthlyPaidShortLeaves,
-          shortLeaveDuration: data.shortLeaveDuration,
-          carryForwardEnabled: data.carryForwardEnabled,
-          leaveEncashmentEnabled: data.leaveEncashmentEnabled,
-        },
-
-        create: {
-          id: crypto.randomUUID(),
-          organizationId,
-          monthlyPaidLeaves: data.monthlyPaidLeaves,
-          monthlyPaidHalfDayLeaves: data.monthlyPaidHalfDayLeaves,
-          monthlyPaidShortLeaves: data.monthlyPaidShortLeaves,
-          shortLeaveDuration: data.shortLeaveDuration,
-          carryForwardEnabled: data.carryForwardEnabled,
-          leaveEncashmentEnabled: data.leaveEncashmentEnabled,
-        },
-
-        select: {
-          id: true,
-          organizationId: true,
-          monthlyPaidLeaves: true,
-          monthlyPaidHalfDayLeaves: true,
-          monthlyPaidShortLeaves: true,
-          shortLeaveDuration: true,
-          carryForwardEnabled: true,
-          leaveEncashmentEnabled: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      });
-
-    // --------------------------------------------------
-    // 7. Return success
-    // --------------------------------------------------
-
+    // 6. Return success
     return actionResponse(
       ACTION_STATUS.OK,
       updatedSettings,
       "Your leave management settings have been updated.",
     );
   } catch (error) {
-    console.error(
-      "[updateLeaveManagement] unexpected error:",
-      error,
-    );
+    console.error("[updateLeaveManagement] unexpected error:", error);
 
     return actionResponse(
       ACTION_STATUS.INTERNAL_SERVER_ERROR,

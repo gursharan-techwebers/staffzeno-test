@@ -1,8 +1,6 @@
 import "server-only";
 
-import { headers } from "next/headers";
-
-import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
 export type UserOrganization = {
   id: string;
@@ -11,9 +9,36 @@ export type UserOrganization = {
   logo: string | null;
 };
 
-export async function getUserOrganizations(): Promise<UserOrganization[]> {
-  const organizations = await auth.api.listOrganizations({
-    headers: await headers(),
+type GetUserOrganizationsParams = {
+  userId: string;
+};
+
+export async function getUserOrganizations({
+  userId,
+}: GetUserOrganizationsParams): Promise<UserOrganization[]> {
+  if (!userId) {
+    return [];
+  }
+
+  const organizations = await prisma.organization.findMany({
+    where: {
+      members: {
+        some: {
+          userId,
+        },
+      },
+    },
+
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      logo: true,
+    },
+
+    orderBy: {
+      name: "asc",
+    },
   });
 
   return organizations.map((organization) => ({

@@ -1,7 +1,5 @@
 "use server";
 
-import "server-only";
-
 import { APIError } from "better-auth/api";
 import { headers } from "next/headers";
 
@@ -14,7 +12,7 @@ import {
 import { prisma } from "@/lib/prisma";
 
 import { canAcceptInvitation } from "../billing/canAcceptInvitation";
-import { getSession } from "../user/getSession";
+import { getAuthContext } from "../auth/getAuthContext";
 
 type AcceptOrganizationInvitationInput = {
   invitationId: string;
@@ -28,10 +26,12 @@ type AcceptOrganizationInvitationSuccess = {
 export async function acceptOrganizationInvitation(
   input: AcceptOrganizationInvitationInput,
 ): Promise<ActionResult<AcceptOrganizationInvitationSuccess>> {
+  const invitationId = input.invitationId?.trim();
+
   // --------------------------------------------------
   // 1. Validate invitation ID
   // --------------------------------------------------
-  if (!input.invitationId?.trim()) {
+  if (!invitationId) {
     return actionResponse(
       ACTION_STATUS.BAD_REQUEST,
       "Invalid or missing invitation.",
@@ -40,14 +40,12 @@ export async function acceptOrganizationInvitation(
   }
 
   try {
-    const requestHeaders = await headers();
-
     // --------------------------------------------------
-    // 2. Check authentication
+    // 2. Authentication
     // --------------------------------------------------
-    const session = await getSession();
+    const authContext = await getAuthContext();
 
-    if (!session) {
+    if (!authContext) {
       return actionResponse(
         ACTION_STATUS.UNAUTHORIZED,
         "You must be logged in to accept this invitation.",
@@ -55,12 +53,17 @@ export async function acceptOrganizationInvitation(
       );
     }
 
+    const { user } = authContext;
+
+    // Get headers only when needed by Better Auth.
+    const requestHeaders = await headers();
+
     // --------------------------------------------------
     // 3. Get invitation
     // --------------------------------------------------
     const invitation = await prisma.invitation.findUnique({
       where: {
-        id: input.invitationId,
+        id: invitationId,
       },
       select: {
         id: true,
@@ -107,7 +110,7 @@ export async function acceptOrganizationInvitation(
     // --------------------------------------------------
     // 6. Verify invited email
     // --------------------------------------------------
-    if (session.user.email.toLowerCase() !== invitation.email.toLowerCase()) {
+    if (user.email.toLowerCase() !== invitation.email.toLowerCase()) {
       return actionResponse(
         ACTION_STATUS.FORBIDDEN,
         "This invitation was sent to a different email address. Please sign in with the invited account.",
@@ -127,17 +130,29 @@ export async function acceptOrganizationInvitation(
     }
 
     // --------------------------------------------------
-    // 8. Verify organization exists
+    // 8. Verify organization and team
     // --------------------------------------------------
-    const organization = await prisma.organization.findUnique({
-      where: {
-        id: invitation.organizationId,
-      },
-      select: {
-        id: true,
-        slug: true,
-      },
-    });
+    const [organization, team] = await Promise.all([
+      prisma.organization.findUnique({
+        where: {
+          id: invitation.organizationId,
+        },
+        select: {
+          id: true,
+          slug: true,
+        },
+      }),
+
+      prisma.team.findFirst({
+        where: {
+          id: invitation.teamId,
+          organizationId: invitation.organizationId,
+        },
+        select: {
+          id: true,
+        },
+      }),
+    ]);
 
     if (!organization) {
       return actionResponse(
@@ -146,19 +161,6 @@ export async function acceptOrganizationInvitation(
         "ORGANIZATION_NOT_FOUND",
       );
     }
-
-    // --------------------------------------------------
-    // 9. Verify team belongs to organization
-    // --------------------------------------------------
-    const team = await prisma.team.findFirst({
-      where: {
-        id: invitation.teamId,
-        organizationId: invitation.organizationId,
-      },
-      select: {
-        id: true,
-      },
-    });
 
     if (!team) {
       return actionResponse(
@@ -169,11 +171,11 @@ export async function acceptOrganizationInvitation(
     }
 
     // --------------------------------------------------
-    // 10. Check if user is already a member
+    // 9. Check existing membership
     // --------------------------------------------------
     const existingMember = await prisma.member.findFirst({
       where: {
-        userId: session.user.id,
+        userId: user.id,
         organizationId: invitation.organizationId,
       },
       select: {
@@ -190,10 +192,10 @@ export async function acceptOrganizationInvitation(
     }
 
     // --------------------------------------------------
-    // 11. Check billing / employee capacity
+    // 10. Check billing / employee capacity
     // --------------------------------------------------
     const canAccept = await canAcceptInvitation(
-      session.user.id,
+      user.id,
       invitation.organizationId,
       invitation.id,
     );
@@ -207,10 +209,7 @@ export async function acceptOrganizationInvitation(
     }
 
     // --------------------------------------------------
-    // 12. Accept invitation
-    //
-    // Better Auth automatically adds the invited user
-    // to invitation.teamId when the invitation is accepted.
+    // 11. Accept invitation
     // --------------------------------------------------
     const result = await auth.api.acceptInvitation({
       body: {
@@ -228,7 +227,7 @@ export async function acceptOrganizationInvitation(
     }
 
     // --------------------------------------------------
-    // 13. Verify created member belongs to organization
+    // 12. Verify organization
     // --------------------------------------------------
     const memberId = result.member.id;
     const organizationId = result.member.organizationId;
@@ -248,7 +247,7 @@ export async function acceptOrganizationInvitation(
     }
 
     // --------------------------------------------------
-    // 14. Save employee title
+    // 13. Save employee title and role
     // --------------------------------------------------
     await prisma.member.update({
       where: {
@@ -261,13 +260,13 @@ export async function acceptOrganizationInvitation(
     });
 
     // --------------------------------------------------
-    // 15. Verify Better Auth added user to the team
+    // 14. Verify team membership
     // --------------------------------------------------
     const teamMembership = await prisma.teamMember.findUnique({
       where: {
         teamId_userId: {
           teamId: team.id,
-          userId: session.user.id,
+          userId: user.id,
         },
       },
       select: {
@@ -277,7 +276,7 @@ export async function acceptOrganizationInvitation(
 
     if (!teamMembership) {
       console.error("[acceptOrganizationInvitation] Team membership missing:", {
-        userId: session.user.id,
+        userId: user.id,
         teamId: team.id,
         organizationId,
       });
@@ -290,7 +289,7 @@ export async function acceptOrganizationInvitation(
     }
 
     // --------------------------------------------------
-    // 16. Set organization as active
+    // 15. Set organization as active
     // --------------------------------------------------
     await auth.api.setActiveOrganization({
       body: {
@@ -300,20 +299,17 @@ export async function acceptOrganizationInvitation(
     });
 
     // --------------------------------------------------
-    // 17. Return success
+    // 16. Return success
     // --------------------------------------------------
     return actionResponse(
       ACTION_STATUS.OK,
       {
-        userId: session.user.id,
+        userId: user.id,
         organizationSlug: organization.slug,
       },
       "Invitation accepted successfully.",
     );
   } catch (error) {
-    // --------------------------------------------------
-    // 18. Better Auth errors
-    // --------------------------------------------------
     if (error instanceof APIError) {
       console.error(
         "[acceptOrganizationInvitation] Better Auth error:",
@@ -327,9 +323,6 @@ export async function acceptOrganizationInvitation(
       );
     }
 
-    // --------------------------------------------------
-    // 19. Unexpected errors
-    // --------------------------------------------------
     console.error("[acceptOrganizationInvitation] unexpected error:", error);
 
     return actionResponse(

@@ -1,7 +1,5 @@
 "use server";
 
-import "server-only";
-
 import { APIError } from "better-auth/api";
 import { headers } from "next/headers";
 
@@ -11,18 +9,19 @@ import {
   ACTION_STATUS,
   type ActionResult,
 } from "@/lib/actionResponse";
-import { getUserInvitations } from "@/server/user/getUserInvitations";
-
+import { prisma } from "@/lib/prisma";
 import type { Invitation } from "@/types/organization/invitation";
 
-import { getSession } from "../user/getSession";
+import { getAuthContext } from "../auth/getAuthContext";
 
 export type ResendInvitationSuccess = Invitation;
 
 export async function resendInvitation(
   invitationId: string,
 ): Promise<ActionResult<ResendInvitationSuccess>> {
-  if (!invitationId?.trim()) {
+  const normalizedInvitationId = invitationId?.trim();
+
+  if (!normalizedInvitationId) {
     return actionResponse(
       ACTION_STATUS.BAD_REQUEST,
       "Invitation ID is required.",
@@ -31,12 +30,13 @@ export async function resendInvitation(
   }
 
   try {
-    const requestHeaders = await headers();
+    // --------------------------------------------------
+    // 1. Authenticate current user
+    // --------------------------------------------------
 
-    // 1. Authenticate user
-    const session = await getSession();
+    const authContext = await getAuthContext();
 
-    if (!session) {
+    if (!authContext) {
       return actionResponse(
         ACTION_STATUS.UNAUTHORIZED,
         "You must be logged in.",
@@ -44,12 +44,15 @@ export async function resendInvitation(
       );
     }
 
-    // 2. Get the user's active organization membership
-    const member = await auth.api.getActiveMember({
-      headers: requestHeaders,
-    });
+    const { session, user } = authContext;
 
-    if (!member) {
+    // --------------------------------------------------
+    // 2. Get active organization
+    // --------------------------------------------------
+
+    const organizationId = session.activeOrganizationId;
+
+    if (!organizationId) {
       return actionResponse(
         ACTION_STATUS.NOT_FOUND,
         "You are not a member of an active organization.",
@@ -57,8 +60,30 @@ export async function resendInvitation(
       );
     }
 
-    // 3. Only admins and owners can resend invitations
-    const isOwnerOrAdmin = member.role === "owner" || member.role === "admin";
+    // --------------------------------------------------
+    // 3. Verify current user's membership and permissions
+    // --------------------------------------------------
+
+    const currentMember = await prisma.member.findFirst({
+      where: {
+        organizationId,
+        userId: user.id,
+      },
+      select: {
+        role: true,
+      },
+    });
+
+    if (!currentMember) {
+      return actionResponse(
+        ACTION_STATUS.FORBIDDEN,
+        "You do not have access to this organization.",
+        "FORBIDDEN",
+      );
+    }
+
+    const isOwnerOrAdmin =
+      currentMember.role === "owner" || currentMember.role === "admin";
 
     if (!isOwnerOrAdmin) {
       return actionResponse(
@@ -68,22 +93,27 @@ export async function resendInvitation(
       );
     }
 
-    // 4. Get invitations for the active organization
-    const invitations = await getUserInvitations();
+    // --------------------------------------------------
+    // 4. Find invitation inside active organization
+    // --------------------------------------------------
 
-    if (!invitations.success) {
-      return actionResponse(
-        invitations.status,
-        invitations.error,
-        invitations.code,
-        invitations.fieldErrors,
-      );
-    }
-
-    // 5. Find the requested invitation
-    const invitation = invitations.data.sent.find(
-      (item) => item.id === invitationId,
-    );
+    const invitation = await prisma.invitation.findFirst({
+      where: {
+        id: normalizedInvitationId,
+        organizationId,
+      },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        title: true,
+        status: true,
+        organizationId: true,
+        teamId: true,
+        expiresAt: true,
+        createdAt: true,
+      },
+    });
 
     if (!invitation) {
       return actionResponse(
@@ -93,16 +123,10 @@ export async function resendInvitation(
       );
     }
 
-    // 6. Extra organization-level security check
-    if (invitation.organizationId !== member.organizationId) {
-      return actionResponse(
-        ACTION_STATUS.FORBIDDEN,
-        "You do not have access to this invitation.",
-        "FORBIDDEN",
-      );
-    }
+    // --------------------------------------------------
+    // 5. Only pending invitations can be resent
+    // --------------------------------------------------
 
-    // 7. Only pending invitations can be resent
     if (invitation.status !== "pending") {
       return actionResponse(
         ACTION_STATUS.CONFLICT,
@@ -111,16 +135,10 @@ export async function resendInvitation(
       );
     }
 
-    // 8. Cancel the old invitation
-    await auth.api.cancelInvitation({
-      body: {
-        invitationId: invitation.id,
-      },
-      headers: requestHeaders,
-    });
+    // --------------------------------------------------
+    // 6. Invitation title is required
+    // --------------------------------------------------
 
-    // 9. Create a fresh invitation
-    //    Preserve the original title.
     if (!invitation.title) {
       return actionResponse(
         ACTION_STATUS.BAD_REQUEST,
@@ -129,54 +147,62 @@ export async function resendInvitation(
       );
     }
 
-    await auth.api.createInvitation({
+    // --------------------------------------------------
+    // 7. Cancel old invitation
+    // --------------------------------------------------
+
+    const requestHeaders = await headers();
+
+    await auth.api.cancelInvitation({
+      body: {
+        invitationId: invitation.id,
+      },
+      headers: requestHeaders,
+    });
+
+    // --------------------------------------------------
+    // 8. Create fresh invitation
+    // --------------------------------------------------
+
+    const newInvitation = await auth.api.createInvitation({
       body: {
         email: invitation.email,
         role: "member",
         organizationId: invitation.organizationId,
         title: invitation.title,
+        ...(invitation.teamId
+          ? {
+              teamId: invitation.teamId,
+            }
+          : {}),
       },
       headers: requestHeaders,
     });
 
-    // 10. Fetch the latest invitations
-    const updatedInvitations = await getUserInvitations();
+    // --------------------------------------------------
+    // 9. Return newly created invitation
+    // --------------------------------------------------
 
-    if (!updatedInvitations.success) {
-      return actionResponse(
-        updatedInvitations.status,
-        updatedInvitations.error,
-        updatedInvitations.code,
-        updatedInvitations.fieldErrors,
-      );
-    }
-
-    // 11. Find the newest pending invitation
-    //     for this email in the active organization.
-    const updatedInvitation = updatedInvitations.data.sent
-      .filter(
-        (item) =>
-          item.organizationId === member.organizationId &&
-          item.email.toLowerCase() === invitation.email.toLowerCase() &&
-          item.status === "pending",
-      )
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
-
-    if (!updatedInvitation) {
-      return actionResponse(
-        ACTION_STATUS.NOT_FOUND,
-        "Invitation was resent, but the new invitation could not be found.",
-        "INVALID_INVITATION",
-      );
-    }
-
-    // 12. Return success
     return actionResponse(
       ACTION_STATUS.OK,
-      updatedInvitation,
+      {
+        id: newInvitation.id,
+        email: newInvitation.email,
+        role: newInvitation.role,
+        title: newInvitation.title,
+        status: newInvitation.status,
+        organizationId: newInvitation.organizationId,
+        expiresAt: newInvitation.expiresAt,
+        createdAt: newInvitation.createdAt,
+        teamId: newInvitation.teamId,
+      },
       "Invitation resent successfully.",
     );
   } catch (error) {
+    // --------------------------------------------------
+    // 10. Handle Better Auth errors
+    // --------------------------------------------------
+
     if (error instanceof APIError) {
       return actionResponse(
         ACTION_STATUS.BAD_REQUEST,

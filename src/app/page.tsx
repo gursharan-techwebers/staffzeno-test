@@ -1,27 +1,36 @@
 import { redirect } from "next/navigation";
 
-import { getActiveOrganization } from "@/server/organization/getActiveOrganization";
+import { getAuthContext } from "@/server/auth/getAuthContext";
 import { getUserOrganizations } from "@/server/organization/getUserOrganizations";
-import { getSession } from "@/server/user/getSession";
 
 export default async function Home() {
-  const session = await getSession();
+  const authContext = await getAuthContext();
 
-  if (!session) {
+  if (!authContext) {
     redirect("/login");
   }
 
-  if (!session.user.emailVerified) {
+  const { session, user } = authContext;
+
+  if (!user.emailVerified) {
     redirect("/verify");
   }
 
-  const organizations = await getUserOrganizations();
+  const organizations = await getUserOrganizations({
+    userId: user.id,
+  });
 
   if (organizations.length === 0) {
     redirect("/onboarding");
   }
 
-  const activeOrganization = await getActiveOrganization();
+  const activeOrganizationId = session.activeOrganizationId;
+
+  const activeOrganization = activeOrganizationId
+    ? organizations.find(
+        (organization) => organization.id === activeOrganizationId,
+      )
+    : null;
 
   const organization = activeOrganization ?? organizations[0];
 

@@ -1,7 +1,5 @@
 "use server";
 
-import { APIError } from "better-auth/api";
-
 import {
   actionResponse,
   ACTION_STATUS,
@@ -9,7 +7,7 @@ import {
 } from "@/lib/actionResponse";
 
 import { prisma } from "@/lib/prisma";
-import { getSession } from "../user/getSession";
+import { getAuthContext } from "../auth/getAuthContext";
 
 type UpdateTeamInput = {
   teamId: string;
@@ -28,32 +26,30 @@ export async function updateTeam(
 ): Promise<ActionResult<UpdateTeamSuccess>> {
   try {
     // --------------------------------------------------
-    // 1. Get current session
+    // 1. Validate input
     // --------------------------------------------------
 
-    const session = await getSession();
-
-    if (!session?.user) {
-      return actionResponse(
-        ACTION_STATUS.UNAUTHORIZED,
-        "Please log in to continue.",
-        "UNAUTHORIZED",
-      );
-    }
-
-    // --------------------------------------------------
-    // 2. Validate input
-    // --------------------------------------------------
-
-    const name = input.name.trim();
+    const teamId = input.teamId?.trim();
+    const name = input.name?.trim();
 
     const adminUserIds = [
       ...new Set(
-        input.adminUserIds.filter(
-          (id): id is string => typeof id === "string" && id.length > 0,
-        ),
+        (input.adminUserIds ?? [])
+          .filter(
+            (id): id is string =>
+              typeof id === "string" && id.trim().length > 0,
+          )
+          .map((id) => id.trim()),
       ),
     ];
+
+    if (!teamId) {
+      return actionResponse(
+        ACTION_STATUS.BAD_REQUEST,
+        "Team ID is required.",
+        "BAD_REQUEST",
+      );
+    }
 
     if (!name) {
       return actionResponse(
@@ -64,12 +60,28 @@ export async function updateTeam(
     }
 
     // --------------------------------------------------
-    // 3. Find team and derive organization
+    // 2. Get authenticated user
+    // --------------------------------------------------
+
+    const authContext = await getAuthContext();
+
+    if (!authContext) {
+      return actionResponse(
+        ACTION_STATUS.UNAUTHORIZED,
+        "Please log in to continue.",
+        "UNAUTHORIZED",
+      );
+    }
+
+    const { user } = authContext;
+
+    // --------------------------------------------------
+    // 3. Get team
     // --------------------------------------------------
 
     const team = await prisma.team.findUnique({
       where: {
-        id: input.teamId,
+        id: teamId,
       },
       select: {
         id: true,
@@ -86,13 +98,13 @@ export async function updateTeam(
     }
 
     // --------------------------------------------------
-    // 4. Check current user's organization membership
+    // 4. Verify current user's organization membership
     // --------------------------------------------------
 
     const currentMember = await prisma.member.findFirst({
       where: {
         organizationId: team.organizationId,
-        userId: session.user.id,
+        userId: user.id,
       },
       select: {
         role: true,
@@ -108,13 +120,10 @@ export async function updateTeam(
     }
 
     // --------------------------------------------------
-    // 5. Only organization owner/admin can manage team
+    // 5. Only owner/admin can manage teams
     // --------------------------------------------------
 
-    const canManageTeam =
-      currentMember.role === "owner" || currentMember.role === "admin";
-
-    if (!canManageTeam) {
+    if (currentMember.role !== "owner" && currentMember.role !== "admin") {
       return actionResponse(
         ACTION_STATUS.FORBIDDEN,
         "You don't have permission to manage this team.",
@@ -123,7 +132,7 @@ export async function updateTeam(
     }
 
     // --------------------------------------------------
-    // 6. Get all current team members
+    // 6. Get current team members
     // --------------------------------------------------
 
     const teamMembers = await prisma.teamMember.findMany({
@@ -137,7 +146,7 @@ export async function updateTeam(
     });
 
     // --------------------------------------------------
-    // 7. Validate selected admin users belong to this team
+    // 7. Verify selected admins are team members
     // --------------------------------------------------
 
     const teamUserIds = new Set(teamMembers.map((member) => member.userId));
@@ -147,13 +156,6 @@ export async function updateTeam(
     );
 
     if (invalidAdminUserIds.length > 0) {
-      console.error("[updateTeam] Invalid admin user IDs:", {
-        teamId: team.id,
-        adminUserIds,
-        teamUserIds: [...teamUserIds],
-        invalidAdminUserIds,
-      });
-
       return actionResponse(
         ACTION_STATUS.BAD_REQUEST,
         "One or more selected admins are not members of this team.",
@@ -162,50 +164,12 @@ export async function updateTeam(
     }
 
     // --------------------------------------------------
-    // 8. Verify all team members belong to organization
-    // --------------------------------------------------
-
-    if (teamMembers.length > 0) {
-      const organizationMembers = await prisma.member.findMany({
-        where: {
-          organizationId: team.organizationId,
-          userId: {
-            in: teamMembers.map((member) => member.userId),
-          },
-        },
-        select: {
-          userId: true,
-        },
-      });
-
-      const organizationUserIds = new Set(
-        organizationMembers.map((member) => member.userId),
-      );
-
-      const invalidTeamMembers = teamMembers.filter(
-        (member) => !organizationUserIds.has(member.userId),
-      );
-
-      if (invalidTeamMembers.length > 0) {
-        return actionResponse(
-          ACTION_STATUS.FORBIDDEN,
-          "One or more team members do not belong to the team's organization.",
-          "FORBIDDEN",
-        );
-      }
-    }
-
-    // --------------------------------------------------
-    // 9. Convert selected User IDs to TeamMember IDs
+    // 8. Synchronize team roles
     // --------------------------------------------------
 
     const adminTeamMemberIds = teamMembers
       .filter((member) => adminUserIds.includes(member.userId))
       .map((member) => member.id);
-
-    // --------------------------------------------------
-    // 10. Update team + synchronize ALL roles
-    // --------------------------------------------------
 
     await prisma.$transaction(async (tx) => {
       // Update team name
@@ -218,7 +182,7 @@ export async function updateTeam(
         },
       });
 
-      // Reset all team members to regular members
+      // Reset all members to regular members
       await tx.teamMember.updateMany({
         where: {
           teamId: team.id,
@@ -228,7 +192,7 @@ export async function updateTeam(
         },
       });
 
-      // Set selected users as admins
+      // Assign selected admins
       if (adminTeamMemberIds.length > 0) {
         await tx.teamMember.updateMany({
           where: {
@@ -245,7 +209,7 @@ export async function updateTeam(
     });
 
     // --------------------------------------------------
-    // 11. Return success
+    // 9. Return success
     // --------------------------------------------------
 
     return actionResponse(
@@ -258,16 +222,6 @@ export async function updateTeam(
       "Team updated successfully.",
     );
   } catch (error) {
-    if (error instanceof APIError) {
-      console.error("[updateTeam] APIError:", error);
-
-      return actionResponse(
-        ACTION_STATUS.BAD_REQUEST,
-        error.body?.message ?? "Unable to update team.",
-        "BAD_REQUEST",
-      );
-    }
-
     console.error("[updateTeam] unexpected error:", error);
 
     return actionResponse(

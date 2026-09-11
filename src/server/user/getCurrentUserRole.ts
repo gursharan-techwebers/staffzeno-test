@@ -1,22 +1,21 @@
 import "server-only";
 
-import { headers } from "next/headers";
-
 import { prisma } from "@/lib/prisma";
-import { getSession } from "./getSession";
+
+import { getAuthContext } from "../auth/getAuthContext";
 
 export type OrganizationRole = "owner" | "admin" | "member";
 
 export async function getCurrentUserRole(): Promise<OrganizationRole | null> {
-  const requestHeaders = await headers();
+  const authContext = await getAuthContext();
 
-  const session = await getSession();
-
-  if (!session) {
+  if (!authContext) {
     return null;
   }
 
-  const organizationId = session.session.activeOrganizationId;
+  const { session, user } = authContext;
+
+  const organizationId = session.activeOrganizationId;
 
   if (!organizationId) {
     return null;
@@ -25,7 +24,7 @@ export async function getCurrentUserRole(): Promise<OrganizationRole | null> {
   const member = await prisma.member.findFirst({
     where: {
       organizationId,
-      userId: session.user.id,
+      userId: user.id,
     },
     select: {
       role: true,

@@ -1,117 +1,122 @@
 import "server-only";
 
-import { headers } from "next/headers";
+import { cache } from "react";
+import { prisma } from "@/lib/prisma";
 
-import { auth } from "@/lib/auth";
 import {
   actionResponse,
   ACTION_STATUS,
   type ActionResult,
 } from "@/lib/actionResponse";
-import { prisma } from "@/lib/prisma";
 
-import { getSession } from "../user/getSession";
+import { getAuthContext } from "@/server/auth/getAuthContext";
+
+import type { Session } from "better-auth";
 
 export type OrganizationRole = "member" | "admin" | "owner";
 
 export type DashboardContext = {
-  session: NonNullable<Awaited<ReturnType<typeof getSession>>>;
+  session: Session;
+
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    image: string | null;
+  };
+
   organization: {
     id: string;
     name: string;
     slug: string;
     logo: string | null;
   };
+
   membership: {
     id: string;
     role: OrganizationRole;
   };
-  headers: Headers;
 };
 
-export async function getDashboardContext(
-  slug: string,
-): Promise<ActionResult<DashboardContext>> {
-  const organizationSlug = slug.trim();
+export const getDashboardContext = cache(
+  async (slug: string): Promise<ActionResult<DashboardContext>> => {
+    const organizationSlug = slug.trim();
 
-  if (!organizationSlug) {
-    return actionResponse(
-      ACTION_STATUS.BAD_REQUEST,
-      "Organization slug is required.",
-      "BAD_REQUEST",
-    );
-  }
+    if (!organizationSlug) {
+      return actionResponse(
+        ACTION_STATUS.BAD_REQUEST,
+        "Organization slug is required.",
+        "BAD_REQUEST",
+      );
+    }
 
-  const requestHeaders = await headers();
+    // Get authenticated user/session.
+    const authContext = await getAuthContext();
 
-  // 1. Get session
-  const session = await getSession();
+    if (!authContext) {
+      return actionResponse(
+        ACTION_STATUS.UNAUTHORIZED,
+        "You must be logged in.",
+        "UNAUTHORIZED",
+      );
+    }
 
-  if (!session) {
-    return actionResponse(
-      ACTION_STATUS.UNAUTHORIZED,
-      "You must be logged in.",
-      "UNAUTHORIZED",
-    );
-  }
+    const { session, user } = authContext;
 
-  // 2. Find requested organization
-  const organization = await prisma.organization.findUnique({
-    where: {
-      slug: organizationSlug,
-    },
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      logo: true,
-    },
-  });
+    // Find organization.
+    const organization = await prisma.organization.findUnique({
+      where: {
+        slug: organizationSlug,
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        logo: true,
+      },
+    });
 
-  if (!organization) {
-    return actionResponse(
-      ACTION_STATUS.NOT_FOUND,
-      "Organization not found.",
-      "ORGANIZATION_NOT_FOUND",
-    );
-  }
+    if (!organization) {
+      return actionResponse(
+        ACTION_STATUS.NOT_FOUND,
+        "Organization not found.",
+        "ORGANIZATION_NOT_FOUND",
+      );
+    }
 
-  // 3. Get current user's membership
-  const membership = await prisma.member.findFirst({
-    where: {
-      organizationId: organization.id,
-      userId: session.user.id,
-    },
-    select: {
-      id: true,
-      role: true,
-    },
-  });
+    // Verify membership and get role.
+    const membership = await prisma.member.findFirst({
+      where: {
+        organizationId: organization.id,
+        userId: user.id,
+      },
+      select: {
+        id: true,
+        role: true,
+      },
+    });
 
-  if (!membership) {
-    return actionResponse(
-      ACTION_STATUS.FORBIDDEN,
-      "You do not have access to this organization.",
-      "FORBIDDEN",
-    );
-  }
+    if (!membership) {
+      return actionResponse(
+        ACTION_STATUS.FORBIDDEN,
+        "You do not have access to this organization.",
+        "FORBIDDEN",
+      );
+    }
 
-  // 4. Set active organization
-  await auth.api.setActiveOrganization({
-    body: {
-      organizationId: organization.id,
-    },
-    headers: requestHeaders,
-  });
-
-  // 5. Return dashboard context
-  return actionResponse(ACTION_STATUS.OK, {
-    session,
-    organization,
-    membership: {
-      id: membership.id,
-      role: membership.role as OrganizationRole,
-    },
-    headers: requestHeaders,
-  });
-}
+    return actionResponse(ACTION_STATUS.OK, {
+      session,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        image: user.image ?? null,
+      },
+      organization,
+      membership: {
+        id: membership.id,
+        role: membership.role as OrganizationRole,
+      },
+    });
+  },
+);

@@ -9,15 +9,15 @@ import {
   ACTION_STATUS,
   type ActionResult,
 } from "@/lib/actionResponse";
+import { prisma } from "@/lib/prisma";
 import type { Invitation } from "@/types/organization/invitation";
 import {
   inviteMemberSchema,
   type InviteMemberInput,
 } from "@/validators/organization/invite";
-import { prisma } from "@/lib/prisma";
 
 import { canAddEmployee } from "../billing/canAddEmployee";
-import { getSession } from "../user/getSession";
+import { getAuthContext } from "../auth/getAuthContext";
 
 export type InviteMemberSuccess = Invitation;
 
@@ -27,6 +27,7 @@ export async function inviteOrganizationMember(
   // --------------------------------------------------
   // 1. Validate input
   // --------------------------------------------------
+
   const parsed = inviteMemberSchema.safeParse(input);
 
   if (!parsed.success) {
@@ -40,15 +41,22 @@ export async function inviteOrganizationMember(
 
   const { email, title, teamId, role } = parsed.data;
 
+  if (!teamId) {
+    return actionResponse(
+      ACTION_STATUS.BAD_REQUEST,
+      "Please select a team for the employee.",
+      "TEAM_REQUIRED",
+    );
+  }
+
   try {
-    const requestHeaders = await headers();
-
     // --------------------------------------------------
-    // 2. Check current session
+    // 2. Authenticate current user
     // --------------------------------------------------
-    const session = await getSession();
 
-    if (!session?.user) {
+    const authContext = await getAuthContext();
+
+    if (!authContext) {
       return actionResponse(
         ACTION_STATUS.UNAUTHORIZED,
         "You must be logged in to invite an employee.",
@@ -56,25 +64,46 @@ export async function inviteOrganizationMember(
       );
     }
 
-    // --------------------------------------------------
-    // 3. Get active organization member
-    // --------------------------------------------------
-    const member = await auth.api.getActiveMember({
-      headers: requestHeaders,
-    });
+    const { session, user } = authContext;
 
-    if (!member) {
+    // --------------------------------------------------
+    // 3. Get active organization
+    // --------------------------------------------------
+
+    const organizationId = session.activeOrganizationId;
+
+    if (!organizationId) {
       return actionResponse(
         ACTION_STATUS.NOT_FOUND,
-        "You are not a member of an active organization.",
+        "No active organization was found.",
         "ORGANIZATION_NOT_FOUND",
       );
     }
 
     // --------------------------------------------------
-    // 4. Only owner and admin can invite employees
+    // 4. Verify current user's membership and permissions
     // --------------------------------------------------
-    const isOwnerOrAdmin = member.role === "owner" || member.role === "admin";
+
+    const currentMember = await prisma.member.findFirst({
+      where: {
+        organizationId,
+        userId: user.id,
+      },
+      select: {
+        role: true,
+      },
+    });
+
+    if (!currentMember) {
+      return actionResponse(
+        ACTION_STATUS.FORBIDDEN,
+        "You are not a member of this organization.",
+        "FORBIDDEN",
+      );
+    }
+
+    const isOwnerOrAdmin =
+      currentMember.role === "owner" || currentMember.role === "admin";
 
     if (!isOwnerOrAdmin) {
       return actionResponse(
@@ -85,38 +114,13 @@ export async function inviteOrganizationMember(
     }
 
     // --------------------------------------------------
-    // 5. Get active organization
+    // 5. Verify team belongs to active organization
     // --------------------------------------------------
-    const activeOrganization = await auth.api.getFullOrganization({
-      headers: requestHeaders,
-    });
 
-    if (!activeOrganization) {
-      return actionResponse(
-        ACTION_STATUS.NOT_FOUND,
-        "No active organization was found.",
-        "ORGANIZATION_NOT_FOUND",
-      );
-    }
-
-    // --------------------------------------------------
-    // 6. Team is required
-    // --------------------------------------------------
-    if (!teamId) {
-      return actionResponse(
-        ACTION_STATUS.BAD_REQUEST,
-        "Please select a team for the employee.",
-        "TEAM_REQUIRED",
-      );
-    }
-
-    // --------------------------------------------------
-    // 7. Make sure team belongs to active organization
-    // --------------------------------------------------
     const team = await prisma.team.findFirst({
       where: {
         id: teamId,
-        organizationId: activeOrganization.id,
+        organizationId,
       },
       select: {
         id: true,
@@ -132,9 +136,10 @@ export async function inviteOrganizationMember(
     }
 
     // --------------------------------------------------
-    // 8. Check employee limit
+    // 6. Check employee limit
     // --------------------------------------------------
-    const canAdd = await canAddEmployee(session.user.id, activeOrganization.id);
+
+    const canAdd = await canAddEmployee(user.id, organizationId);
 
     if (!canAdd) {
       return actionResponse(
@@ -145,13 +150,16 @@ export async function inviteOrganizationMember(
     }
 
     // --------------------------------------------------
-    // 9. Create invitation
+    // 7. Create invitation through Better Auth
     // --------------------------------------------------
+
+    const requestHeaders = await headers();
+
     const invitation = await auth.api.createInvitation({
       body: {
         email,
         role,
-        organizationId: activeOrganization.id,
+        organizationId,
         title,
         teamId: team.id,
       },
@@ -159,8 +167,9 @@ export async function inviteOrganizationMember(
     });
 
     // --------------------------------------------------
-    // 10. Return invitation
+    // 8. Return invitation
     // --------------------------------------------------
+
     return actionResponse(
       ACTION_STATUS.OK,
       {
@@ -178,8 +187,9 @@ export async function inviteOrganizationMember(
     );
   } catch (error) {
     // --------------------------------------------------
-    // 11. Handle Better Auth errors
+    // 9. Handle Better Auth errors
     // --------------------------------------------------
+
     if (error instanceof APIError) {
       return actionResponse(
         ACTION_STATUS.BAD_REQUEST,
@@ -188,9 +198,6 @@ export async function inviteOrganizationMember(
       );
     }
 
-    // --------------------------------------------------
-    // 12. Handle unexpected errors
-    // --------------------------------------------------
     console.error("[inviteOrganizationMember] unexpected error:", error);
 
     return actionResponse(

@@ -8,51 +8,52 @@ import {
 import { prisma } from "@/lib/prisma";
 
 import type { Invitation } from "@/types/organization/invitation";
-import { getSession } from "./getSession";
+
+type GetUserInvitationsParams = {
+  organizationId: string;
+  userId: string;
+  userEmail: string;
+};
 
 type GetUserInvitationsSuccess = {
   sent: Invitation[];
   received: Invitation[];
 };
 
-export async function getUserInvitations(): Promise<
-  ActionResult<GetUserInvitationsSuccess>
-> {
+export async function getUserInvitations({
+  organizationId,
+  userId,
+  userEmail,
+}: GetUserInvitationsParams): Promise<ActionResult<GetUserInvitationsSuccess>> {
+  if (!organizationId || !userId || !userEmail) {
+    return actionResponse(
+      ACTION_STATUS.BAD_REQUEST,
+      "User and organization context is required.",
+      "BAD_REQUEST",
+    );
+  }
+
   try {
-    const session = await getSession();
-
-    if (!session) {
-      return actionResponse(
-        ACTION_STATUS.UNAUTHORIZED,
-        "You must be logged in.",
-        "UNAUTHORIZED",
-      );
-    }
-
-    const userId = session.user.id;
-    const userEmail = session.user.email;
-    const organizationId = session.session.activeOrganizationId;
-
-    if (!organizationId) {
-      return actionResponse(
-        ACTION_STATUS.NOT_FOUND,
-        "No active organization found.",
-        "ORGANIZATION_NOT_FOUND",
-      );
-    }
-
     const [sent, received] = await Promise.all([
+      // --------------------------------------------------
+      // Invitations sent by the current user
+      // --------------------------------------------------
       prisma.invitation.findMany({
         where: {
           organizationId,
           inviterId: userId,
         },
+
         select: {
           id: true,
           createdAt: true,
           expiresAt: true,
           email: true,
           title: true,
+          organizationId: true,
+          role: true,
+          status: true,
+
           organization: {
             select: {
               id: true,
@@ -61,24 +62,26 @@ export async function getUserInvitations(): Promise<
               logo: true,
             },
           },
-          organizationId: true,
-          role: true,
-          status: true,
         },
+
         orderBy: {
           createdAt: "desc",
         },
       }),
 
+      // --------------------------------------------------
+      // Invitations received by the current user's email
+      // --------------------------------------------------
       prisma.invitation.findMany({
         where: {
           organizationId,
           email: userEmail,
         },
+
         select: {
           id: true,
           email: true,
-          title: true, // <-- ADD THIS
+          title: true,
           role: true,
           status: true,
           organizationId: true,
@@ -95,6 +98,7 @@ export async function getUserInvitations(): Promise<
             },
           },
         },
+
         orderBy: {
           createdAt: "desc",
         },

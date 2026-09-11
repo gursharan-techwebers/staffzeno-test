@@ -21,22 +21,53 @@ export type Team = {
   members: TeamMember[];
 };
 
-export async function getTeamFromId(
-  teamId: string,
-): Promise<Team | null> {
-  const team = await prisma.team.findUnique({
+type GetTeamFromIdParams = {
+  teamId: string;
+  organizationId: string;
+};
+
+export async function getTeamFromId({
+  teamId,
+  organizationId,
+}: GetTeamFromIdParams): Promise<Team | null> {
+  if (!teamId || !organizationId) {
+    return null;
+  }
+
+  const team = await prisma.team.findFirst({
     where: {
       id: teamId,
+      organizationId,
     },
-    include: {
+    select: {
+      id: true,
+      name: true,
+      memberCount: true,
+      createdAt: true,
+
       teammembers: {
-        include: {
+        select: {
+          id: true,
+          userId: true,
+          role: true,
+          createdAt: true,
+
           user: {
             select: {
               id: true,
               name: true,
               email: true,
               image: true,
+
+              members: {
+                where: {
+                  organizationId,
+                },
+                select: {
+                  title: true,
+                },
+                take: 1,
+              },
             },
           },
         },
@@ -47,26 +78,6 @@ export async function getTeamFromId(
   if (!team) {
     return null;
   }
-
-  const organizationMembers = await prisma.member.findMany({
-    where: {
-      organizationId: team.organizationId,
-      userId: {
-        in: team.teammembers.map((member) => member.userId),
-      },
-    },
-    select: {
-      userId: true,
-      title: true,
-    },
-  });
-
-  const titleByUserId = new Map(
-    organizationMembers.map((member) => [
-      member.userId,
-      member.title,
-    ]),
-  );
 
   return {
     id: team.id,
@@ -80,7 +91,7 @@ export async function getTeamFromId(
       name: member.user.name,
       email: member.user.email,
       image: member.user.image,
-      title: titleByUserId.get(member.userId) ?? null,
+      title: member.user.members[0]?.title ?? null,
       role: member.role,
       createdAt: member.createdAt,
     })),

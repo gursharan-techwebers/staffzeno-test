@@ -1,8 +1,5 @@
 import "server-only";
 
-import { headers } from "next/headers";
-
-import { auth } from "@/lib/auth";
 import {
   actionResponse,
   ACTION_STATUS,
@@ -10,47 +7,42 @@ import {
 } from "@/lib/actionResponse";
 import { prisma } from "@/lib/prisma";
 
-import { getSession } from "../user/getSession";
-import { OrganizationEmployee, OrganizationEmployeeRole } from "@/types/organization/team";
+import {
+  OrganizationEmployee,
+  OrganizationEmployeeRole,
+} from "@/types/organization/team";
 
-export async function getOrganizationEmployees(): Promise<
+type GetOrganizationEmployeesParams = {
+  organizationId: string;
+  userRole: string;
+};
+
+export async function getOrganizationEmployees({
+  organizationId,
+  userRole,
+}: GetOrganizationEmployeesParams): Promise<
   ActionResult<OrganizationEmployee[]>
 > {
+  if (!organizationId) {
+    return actionResponse(
+      ACTION_STATUS.BAD_REQUEST,
+      "Organization context is required.",
+      "BAD_REQUEST",
+    );
+  }
+
+  // --------------------------------------------------
+  // Authorization
+  // --------------------------------------------------
+  if (userRole !== "owner" && userRole !== "admin") {
+    return actionResponse(
+      ACTION_STATUS.FORBIDDEN,
+      "Only organization admins and owners can view employees.",
+      "FORBIDDEN",
+    );
+  }
+
   try {
-    const requestHeaders = await headers();
-
-    const session = await getSession();
-
-    if (!session?.user) {
-      return actionResponse(
-        ACTION_STATUS.UNAUTHORIZED,
-        "You must be logged in.",
-        "UNAUTHORIZED",
-      );
-    }
-
-    const activeMember = await auth.api.getActiveMember({
-      headers: requestHeaders,
-    });
-
-    if (!activeMember) {
-      return actionResponse(
-        ACTION_STATUS.NOT_FOUND,
-        "No active organization found.",
-        "ORGANIZATION_NOT_FOUND",
-      );
-    }
-
-    const organizationId = activeMember.organizationId;
-
-    if (activeMember.role !== "owner" && activeMember.role !== "admin") {
-      return actionResponse(
-        ACTION_STATUS.FORBIDDEN,
-        "Only organization admins and owners can view employees.",
-        "FORBIDDEN",
-      );
-    }
-
     const members = await prisma.member.findMany({
       where: {
         organizationId,
@@ -75,7 +67,7 @@ export async function getOrganizationEmployees(): Promise<
             email: true,
             image: true,
 
-            // Get teams belonging to THIS organization only
+            // Only teams belonging to this organization
             teammembers: {
               where: {
                 team: {
@@ -114,9 +106,8 @@ export async function getOrganizationEmployees(): Promise<
 
         title: member.title,
 
-        // Current team.
-        // null means the employee is not assigned
-        // to a team.
+        // First team is treated as the current team.
+        // null means the employee has no team.
         teamId: teams[0]?.id ?? null,
 
         createdAt: member.createdAt,

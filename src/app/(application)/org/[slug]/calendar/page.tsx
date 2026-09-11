@@ -2,30 +2,41 @@ import { Clock3Icon, Settings2Icon } from "lucide-react";
 import { redirect } from "next/navigation";
 
 import EmptyState from "@/components/shared/dashboard/EmptyState";
-
-import { getActiveOrganization } from "@/server/organization/getActiveOrganization";
-import { getUserOrganizationRole } from "@/server/organization/getUserOrganizationRole";
-import { getOrganizationHolidays } from "@/server/organization/getOrganizationHolidays";
-import { getOrganizationAttendanceSettings } from "@/server/organization/getOrganizationAttendanceSettings";
-
 import CalendarContent from "@/components/dashboard/Calendar/CalendarContent";
 
-const Calendar = async () => {
-  const organization = await getActiveOrganization();
+import { getDashboardContext } from "@/server/organization/getDashboardContext";
+import { getOrganizationAttendanceSettings } from "@/server/organization/getOrganizationAttendanceSettings";
+import { getOrganizationHolidays } from "@/server/organization/getOrganizationHolidays";
 
-  if (!organization) {
-    return null;
+type Props = {
+  params: Promise<{
+    slug: string;
+  }>;
+};
+
+const Calendar = async ({ params }: Props) => {
+  const { slug } = await params;
+
+  const dashboard = await getDashboardContext(slug);
+
+  if (!dashboard.success) {
+    if (dashboard.code === "UNAUTHORIZED") {
+      redirect("/login");
+    }
+
+    redirect("/");
   }
 
-  const [attendanceSettings, roleResult, holidaysResult] = await Promise.all([
-    getOrganizationAttendanceSettings(),
-    getUserOrganizationRole(),
-    getOrganizationHolidays(),
+  const { organization, user, membership } = dashboard.data;
+
+  const [attendanceSettings, holidaysResult] = await Promise.all([
+    getOrganizationAttendanceSettings({
+      organizationId: organization.id,
+    }),
+    getOrganizationHolidays({
+      organizationId: organization.id,
+    }),
   ]);
-
-  if (!roleResult.success) {
-    return null;
-  }
 
   if (!attendanceSettings) {
     return (
@@ -45,7 +56,7 @@ const Calendar = async () => {
   }
 
   const canManageHolidays =
-    roleResult.data === "owner" || roleResult.data === "admin";
+    membership.role === "owner" || membership.role === "admin";
 
   return (
     <CalendarContent

@@ -1,14 +1,12 @@
 "use server";
 
-import { APIError } from "better-auth/api";
-
 import {
   actionResponse,
   ACTION_STATUS,
   type ActionResult,
 } from "@/lib/actionResponse";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "../user/getSession";
+import { getAuthContext } from "../auth/getAuthContext";
 
 export type DeleteMemberSuccess = {
   memberId: string;
@@ -18,11 +16,22 @@ export async function deleteMember(
   organizationId: string,
   memberId: string,
 ): Promise<ActionResult<DeleteMemberSuccess>> {
-  try {
-    // 1. Get current session
-    const session = await getSession();
+  const normalizedOrganizationId = organizationId?.trim();
+  const normalizedMemberId = memberId?.trim();
 
-    if (!session?.user) {
+  if (!normalizedOrganizationId || !normalizedMemberId) {
+    return actionResponse(
+      ACTION_STATUS.BAD_REQUEST,
+      "Organization ID and member ID are required.",
+      "BAD_REQUEST",
+    );
+  }
+
+  try {
+    // 1. Authenticate current user
+    const authContext = await getAuthContext();
+
+    if (!authContext) {
       return actionResponse(
         ACTION_STATUS.UNAUTHORIZED,
         "Unauthorized. Please log in again.",
@@ -30,14 +39,38 @@ export async function deleteMember(
       );
     }
 
-    // 2. Verify current user's membership and permissions
+    const { session, user } = authContext;
+
+    // 2. Always use the authenticated active organization.
+    //    Do not trust organizationId from the client for authorization.
+    const activeOrganizationId = session.activeOrganizationId;
+
+    if (!activeOrganizationId) {
+      return actionResponse(
+        ACTION_STATUS.FORBIDDEN,
+        "You must have an active organization.",
+        "FORBIDDEN",
+      );
+    }
+
+    // Optional consistency check.
+    // The action was called with an organizationId, so make sure it
+    // matches the authenticated active organization.
+    if (activeOrganizationId !== normalizedOrganizationId) {
+      return actionResponse(
+        ACTION_STATUS.FORBIDDEN,
+        "You do not have access to this organization.",
+        "FORBIDDEN",
+      );
+    }
+
+    // 3. Verify current user's membership and permissions
     const currentMember = await prisma.member.findFirst({
       where: {
-        organizationId,
-        userId: session.user.id,
+        organizationId: activeOrganizationId,
+        userId: user.id,
       },
       select: {
-        id: true,
         role: true,
       },
     });
@@ -50,7 +83,6 @@ export async function deleteMember(
       );
     }
 
-    // 3. Only organization owner and admin can remove members
     const isOwnerOrAdmin =
       currentMember.role === "owner" || currentMember.role === "admin";
 
@@ -62,11 +94,11 @@ export async function deleteMember(
       );
     }
 
-    // 4. Find the member inside this organization
+    // 4. Find the member inside the authenticated organization
     const memberToDelete = await prisma.member.findFirst({
       where: {
-        id: memberId,
-        organizationId,
+        id: normalizedMemberId,
+        organizationId: activeOrganizationId,
       },
       select: {
         id: true,
@@ -92,16 +124,13 @@ export async function deleteMember(
       );
     }
 
-    // 6. Remove organization membership and all team memberships
-    //    belonging to this user inside this organization.
+    // 6. Remove organization membership and team memberships atomically
     await prisma.$transaction(async (tx) => {
-      // Find all team memberships for this user
-      // only from teams belonging to this organization.
       const teamMemberships = await tx.teamMember.findMany({
         where: {
           userId: memberToDelete.userId,
           team: {
-            organizationId,
+            organizationId: activeOrganizationId,
           },
         },
         select: {
@@ -109,18 +138,17 @@ export async function deleteMember(
         },
       });
 
-      // Delete the user's team memberships
       if (teamMemberships.length > 0) {
         await tx.teamMember.deleteMany({
           where: {
             userId: memberToDelete.userId,
             team: {
-              organizationId,
+              organizationId: activeOrganizationId,
             },
           },
         });
 
-        // Keep Team.memberCount in sync
+        // Keep Team.memberCount synchronized
         for (const { teamId } of teamMemberships) {
           await tx.team.update({
             where: {
@@ -135,7 +163,7 @@ export async function deleteMember(
         }
       }
 
-      // Delete organization membership
+      // Remove organization membership
       await tx.member.delete({
         where: {
           id: memberToDelete.id,
@@ -143,7 +171,7 @@ export async function deleteMember(
       });
     });
 
-    // 7. Return structured success
+    // 7. Return minimal success payload
     return actionResponse(
       ACTION_STATUS.OK,
       {
@@ -152,17 +180,6 @@ export async function deleteMember(
       "Employee removed successfully.",
     );
   } catch (error) {
-    // 8. Handle Better Auth errors
-    if (error instanceof APIError) {
-      return actionResponse(
-        ACTION_STATUS.BAD_REQUEST,
-        error.body?.message ??
-          "Unable to remove the employee. Please try again.",
-        "BAD_REQUEST",
-      );
-    }
-
-    // 9. Handle unexpected errors
     console.error("[deleteMember] unexpected error:", error);
 
     return actionResponse(

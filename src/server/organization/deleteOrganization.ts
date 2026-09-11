@@ -1,8 +1,5 @@
 "use server";
 
-import { headers } from "next/headers";
-
-import { auth } from "@/lib/auth";
 import {
   actionResponse,
   ACTION_STATUS,
@@ -10,7 +7,7 @@ import {
 } from "@/lib/actionResponse";
 import { prisma } from "@/lib/prisma";
 
-import { getSession } from "../user/getSession";
+import { getAuthContext } from "../auth/getAuthContext";
 
 type DeletedOrganization = {
   id: string;
@@ -21,14 +18,12 @@ export async function deleteOrganization(): Promise<
 > {
   try {
     // --------------------------------------------------
-    // 1. Get current session
+    // 1. Authenticate current user
     // --------------------------------------------------
 
-    const requestHeaders = await headers();
+    const authContext = await getAuthContext();
 
-    const session = await getSession();
-
-    if (!session?.user) {
+    if (!authContext) {
       return actionResponse(
         ACTION_STATUS.UNAUTHORIZED,
         "You must be logged in.",
@@ -36,15 +31,15 @@ export async function deleteOrganization(): Promise<
       );
     }
 
+    const { session, user } = authContext;
+
     // --------------------------------------------------
-    // 2. Get active organization member
+    // 2. Get active organization
     // --------------------------------------------------
 
-    const activeMember = await auth.api.getActiveMember({
-      headers: requestHeaders,
-    });
+    const organizationId = session.activeOrganizationId;
 
-    if (!activeMember) {
+    if (!organizationId) {
       return actionResponse(
         ACTION_STATUS.NOT_FOUND,
         "No active organization found.",
@@ -52,13 +47,29 @@ export async function deleteOrganization(): Promise<
       );
     }
 
-    const organizationId = activeMember.organizationId;
-
     // --------------------------------------------------
-    // 3. Only organization owner can delete
+    // 3. Verify current user is the organization owner
     // --------------------------------------------------
 
-    if (activeMember.role !== "owner") {
+    const currentMember = await prisma.member.findFirst({
+      where: {
+        organizationId,
+        userId: user.id,
+      },
+      select: {
+        role: true,
+      },
+    });
+
+    if (!currentMember) {
+      return actionResponse(
+        ACTION_STATUS.FORBIDDEN,
+        "You do not have access to this organization.",
+        "FORBIDDEN",
+      );
+    }
+
+    if (currentMember.role !== "owner") {
       return actionResponse(
         ACTION_STATUS.FORBIDDEN,
         "Only the organization owner can delete the organization.",
@@ -67,28 +78,7 @@ export async function deleteOrganization(): Promise<
     }
 
     // --------------------------------------------------
-    // 4. Check organization exists
-    // --------------------------------------------------
-
-    const organization = await prisma.organization.findUnique({
-      where: {
-        id: organizationId,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (!organization) {
-      return actionResponse(
-        ACTION_STATUS.NOT_FOUND,
-        "Organization not found.",
-        "ORGANIZATION_NOT_FOUND",
-      );
-    }
-
-    // --------------------------------------------------
-    // 5. Delete organization
+    // 4. Delete organization
     // --------------------------------------------------
 
     await prisma.organization.delete({
@@ -98,7 +88,7 @@ export async function deleteOrganization(): Promise<
     });
 
     // --------------------------------------------------
-    // 6. Return success
+    // 5. Return success
     // --------------------------------------------------
 
     return actionResponse(

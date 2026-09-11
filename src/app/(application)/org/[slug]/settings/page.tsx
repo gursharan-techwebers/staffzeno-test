@@ -1,8 +1,10 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import OrganizationSettingsContent from "@/components/dashboard/Settings/OrganizationSettings/OrganizationSettingsContent";
 import { DashboardPageHeader } from "@/components/dashboard/dashboardPageHeader";
-import { getActiveOrganization } from "@/server/organization/getActiveOrganization";
+
+import { getDashboardContext } from "@/server/organization/getDashboardContext";
+import { getOrganizationSettings } from "@/server/organization/getOrganizationSettings";
 import { getOrganizationAttendanceSettings } from "@/server/organization/getOrganizationAttendanceSettings";
 import { getOrganizationLeaveSettings } from "@/server/organization/getOrganizationLeaveSettings";
 
@@ -12,17 +14,37 @@ type Props = {
   }>;
 };
 
-const OrganizationSettings = async ({ params: _params }: Props) => {
-  const organization = await getActiveOrganization();
+const OrganizationSettings = async ({ params }: Props) => {
+  const { slug } = await params;
 
-  if (!organization) {
+  const dashboard = await getDashboardContext(slug);
+
+  if (!dashboard.success) {
+    if (dashboard.code === "UNAUTHORIZED") {
+      redirect("/login");
+    }
+
     notFound();
   }
 
-  const [attendanceSettings, leaveSettings] = await Promise.all([
-    getOrganizationAttendanceSettings(),
-    getOrganizationLeaveSettings(),
-  ]);
+  const { organization } = dashboard.data;
+
+  const [organizationSettings, attendanceSettings, leaveSettings] =
+    await Promise.all([
+      getOrganizationSettings({
+        organizationId: organization.id,
+      }),
+      getOrganizationAttendanceSettings({
+        organizationId: organization.id,
+      }),
+      getOrganizationLeaveSettings({
+        organizationId: organization.id,
+      }),
+    ]);
+
+  if (!organizationSettings) {
+    notFound();
+  }
 
   return (
     <div className="w-full max-w-2xl">
@@ -33,11 +55,11 @@ const OrganizationSettings = async ({ params: _params }: Props) => {
 
       <OrganizationSettingsContent
         organization={{
-          id: organization.id,
-          name: organization.name,
-          email: organization.email,
-          phone: organization.phone,
-          address: organization.address,
+          id: organizationSettings.id,
+          name: organizationSettings.name,
+          email: organizationSettings.email,
+          phone: organizationSettings.phone,
+          address: organizationSettings.address,
         }}
         attendanceSettings={attendanceSettings}
         leaveSettings={leaveSettings}

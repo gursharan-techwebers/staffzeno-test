@@ -1,7 +1,5 @@
 "use server";
 
-import "server-only";
-
 import { headers } from "next/headers";
 
 import { auth } from "@/lib/auth";
@@ -11,30 +9,15 @@ import {
   ACTION_STATUS,
   type ActionResult,
 } from "@/lib/actionResponse";
-import { getSession } from "./getSession";
+
+import { getAuthContext } from "../auth/getAuthContext";
 
 export async function revokeUserSession(
   sessionId: string,
 ): Promise<ActionResult<null>> {
-  // --------------------------------------------------
-  // Authentication
-  // --------------------------------------------------
+  const normalizedSessionId = sessionId?.trim();
 
-  const currentSession = await getSession();
-
-  if (!currentSession?.user) {
-    return actionResponse(
-      ACTION_STATUS.UNAUTHORIZED,
-      "You must be logged in to revoke a session.",
-      "UNAUTHORIZED",
-    );
-  }
-
-  // --------------------------------------------------
-  // Validate session ID
-  // --------------------------------------------------
-
-  if (!sessionId) {
+  if (!normalizedSessionId) {
     return actionResponse(
       ACTION_STATUS.BAD_REQUEST,
       "Session ID is required.",
@@ -42,14 +25,22 @@ export async function revokeUserSession(
     );
   }
 
-  // --------------------------------------------------
-  // Find session belonging to current user
-  // --------------------------------------------------
+  const authContext = await getAuthContext();
+
+  if (!authContext) {
+    return actionResponse(
+      ACTION_STATUS.UNAUTHORIZED,
+      "You must be logged in to revoke a session.",
+      "UNAUTHORIZED",
+    );
+  }
+
+  const { session: currentSession, user } = authContext;
 
   const session = await prisma.session.findFirst({
     where: {
-      id: sessionId,
-      userId: currentSession.user.id,
+      id: normalizedSessionId,
+      userId: user.id,
       expiresAt: {
         gt: new Date(),
       },
@@ -68,21 +59,13 @@ export async function revokeUserSession(
     );
   }
 
-  // --------------------------------------------------
-  // Prevent revoking current session
-  // --------------------------------------------------
-
-  if (session.id === currentSession.session.id) {
+  if (session.id === currentSession.id) {
     return actionResponse(
       ACTION_STATUS.BAD_REQUEST,
       "You cannot revoke your current session.",
       "BAD_REQUEST",
     );
   }
-
-  // --------------------------------------------------
-  // Revoke session
-  // --------------------------------------------------
 
   try {
     await auth.api.revokeSession({

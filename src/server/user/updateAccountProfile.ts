@@ -1,7 +1,5 @@
 "use server";
 
-import "server-only";
-
 import { prisma } from "@/lib/prisma";
 import {
   actionResponse,
@@ -13,7 +11,7 @@ import {
   type UpdateAccountProfileInput,
 } from "@/validators/auth/account";
 
-import { getSession } from "./getSession";
+import { getAuthContext } from "../auth/getAuthContext";
 
 export async function updateAccountProfile(
   input: UpdateAccountProfileInput,
@@ -22,9 +20,9 @@ export async function updateAccountProfile(
   // Authentication
   // ---------------------------------------------------------------------------
 
-  const session = await getSession();
+  const authContext = await getAuthContext();
 
-  if (!session?.user) {
+  if (!authContext) {
     return actionResponse(
       ACTION_STATUS.UNAUTHORIZED,
       "You must be logged in to update your profile.",
@@ -63,6 +61,7 @@ export async function updateAccountProfile(
     );
   }
 
+  const { user } = authContext;
   const { name, phone } = validation.data;
 
   // ---------------------------------------------------------------------------
@@ -72,7 +71,7 @@ export async function updateAccountProfile(
   try {
     await prisma.user.update({
       where: {
-        id: session.user.id,
+        id: user.id,
       },
       data: {
         name,

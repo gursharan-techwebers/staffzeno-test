@@ -1,7 +1,7 @@
 "use server";
 
-import { headers } from "next/headers";
 import { APIError } from "better-auth/api";
+import { headers } from "next/headers";
 
 import {
   actionResponse,
@@ -11,8 +11,10 @@ import {
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "../user/getSession";
+
 import { OrganizationEmployeeRole } from "@/types/organization/team";
+
+import { getAuthContext } from "../auth/getAuthContext";
 
 type UpdateOrganizationEmployeeInput = {
   organizationId: string;
@@ -32,10 +34,47 @@ type UpdateOrganizationEmployeeSuccess = {
 export async function updateOrganizationEmployee(
   input: UpdateOrganizationEmployeeInput,
 ): Promise<ActionResult<UpdateOrganizationEmployeeSuccess>> {
-  try {
-    const session = await getSession();
+  // --------------------------------------------------
+  // 1. Validate input
+  // --------------------------------------------------
 
-    if (!session?.user) {
+  const organizationId = input.organizationId?.trim();
+  const memberId = input.memberId?.trim();
+  const teamId = input.teamId?.trim() || null;
+  const title = input.title?.trim() ?? "";
+
+  if (!organizationId || !memberId) {
+    return actionResponse(
+      ACTION_STATUS.BAD_REQUEST,
+      "Organization ID and member ID are required.",
+      "BAD_REQUEST",
+    );
+  }
+
+  if (input.role !== "admin" && input.role !== "member") {
+    return actionResponse(
+      ACTION_STATUS.BAD_REQUEST,
+      "Invalid employee role.",
+      "BAD_REQUEST",
+    );
+  }
+
+  if (title.length > 100) {
+    return actionResponse(
+      ACTION_STATUS.BAD_REQUEST,
+      "Employee title cannot exceed 100 characters.",
+      "BAD_REQUEST",
+    );
+  }
+
+  try {
+    // --------------------------------------------------
+    // 2. Get authenticated user/session
+    // --------------------------------------------------
+
+    const authContext = await getAuthContext();
+
+    if (!authContext) {
       return actionResponse(
         ACTION_STATUS.UNAUTHORIZED,
         "Please log in to continue.",
@@ -43,30 +82,39 @@ export async function updateOrganizationEmployee(
       );
     }
 
-    if (input.role !== "admin" && input.role !== "member") {
+    const { session, user } = authContext;
+
+    // --------------------------------------------------
+    // 3. Get active organization
+    // --------------------------------------------------
+
+    const activeOrganizationId = session.activeOrganizationId;
+
+    if (!activeOrganizationId) {
       return actionResponse(
-        ACTION_STATUS.BAD_REQUEST,
-        "Invalid employee role.",
-        "BAD_REQUEST",
+        ACTION_STATUS.FORBIDDEN,
+        "You must have an active organization.",
+        "ORGANIZATION_NOT_FOUND",
       );
     }
 
-    const title = input.title.trim();
-
-    if (title.length > 100) {
+    // Never trust organizationId supplied by the client
+    if (activeOrganizationId !== organizationId) {
       return actionResponse(
-        ACTION_STATUS.BAD_REQUEST,
-        "Employee title cannot exceed 100 characters.",
-        "BAD_REQUEST",
+        ACTION_STATUS.FORBIDDEN,
+        "You do not have access to this organization.",
+        "FORBIDDEN",
       );
     }
 
-    const requestHeaders = await headers();
+    // --------------------------------------------------
+    // 4. Verify current user's membership + permission
+    // --------------------------------------------------
 
     const currentMember = await prisma.member.findFirst({
       where: {
-        organizationId: input.organizationId,
-        userId: session.user.id,
+        organizationId: activeOrganizationId,
+        userId: user.id,
       },
       select: {
         role: true,
@@ -89,10 +137,14 @@ export async function updateOrganizationEmployee(
       );
     }
 
+    // --------------------------------------------------
+    // 5. Find employee within active organization
+    // --------------------------------------------------
+
     const memberToUpdate = await prisma.member.findFirst({
       where: {
-        id: input.memberId,
-        organizationId: input.organizationId,
+        id: memberId,
+        organizationId: activeOrganizationId,
       },
       select: {
         id: true,
@@ -109,6 +161,10 @@ export async function updateOrganizationEmployee(
       );
     }
 
+    // --------------------------------------------------
+    // 6. Never modify organization owner
+    // --------------------------------------------------
+
     if (memberToUpdate.role === "owner") {
       return actionResponse(
         ACTION_STATUS.FORBIDDEN,
@@ -117,11 +173,15 @@ export async function updateOrganizationEmployee(
       );
     }
 
-    if (input.teamId) {
+    // --------------------------------------------------
+    // 7. Validate selected team
+    // --------------------------------------------------
+
+    if (teamId) {
       const team = await prisma.team.findFirst({
         where: {
-          id: input.teamId,
-          organizationId: input.organizationId,
+          id: teamId,
+          organizationId: activeOrganizationId,
         },
         select: {
           id: true,
@@ -136,6 +196,32 @@ export async function updateOrganizationEmployee(
         );
       }
     }
+
+    // --------------------------------------------------
+    // 8. Get existing team memberships
+    // --------------------------------------------------
+
+    const existingTeamMemberships = await prisma.teamMember.findMany({
+      where: {
+        userId: memberToUpdate.userId,
+        team: {
+          organizationId: activeOrganizationId,
+        },
+      },
+      select: {
+        teamId: true,
+      },
+    });
+
+    // --------------------------------------------------
+    // 9. Prepare Better Auth headers
+    // --------------------------------------------------
+
+    const requestHeaders = await headers();
+
+    // --------------------------------------------------
+    // 10. Update employee role/title
+    // --------------------------------------------------
 
     const updatedMember = await prisma.member.update({
       where: {
@@ -152,21 +238,10 @@ export async function updateOrganizationEmployee(
       },
     });
 
-    const existingTeamMemberships = await prisma.teamMember.findMany({
-      where: {
-        userId: memberToUpdate.userId,
-        team: {
-          organizationId: input.organizationId,
-        },
-      },
-      select: {
-        teamId: true,
-      },
-    });
+    // --------------------------------------------------
+    // 11. Remove existing team memberships
+    // --------------------------------------------------
 
-    // --------------------------------------------------
-    // 12. Remove existing team memberships
-    // --------------------------------------------------
     for (const membership of existingTeamMemberships) {
       await auth.api.removeTeamMember({
         body: {
@@ -177,28 +252,38 @@ export async function updateOrganizationEmployee(
       });
     }
 
-    if (input.teamId) {
+    // --------------------------------------------------
+    // 12. Add new team membership
+    // --------------------------------------------------
+
+    if (teamId) {
       await auth.api.addTeamMember({
         body: {
-          teamId: input.teamId,
+          teamId,
           userId: memberToUpdate.userId,
         },
         headers: requestHeaders,
       });
     }
 
+    // --------------------------------------------------
+    // 13. Return success
+    // --------------------------------------------------
+
     return actionResponse(
       ACTION_STATUS.OK,
       {
         memberId: updatedMember.id,
         role: updatedMember.role as "admin" | "member",
-        teamId: input.teamId,
+        teamId,
         title: updatedMember.title,
       },
       "Employee updated successfully.",
     );
   } catch (error) {
     if (error instanceof APIError) {
+      console.error("[updateOrganizationEmployee] API error:", error);
+
       return actionResponse(
         ACTION_STATUS.BAD_REQUEST,
         error.body?.message ?? "Unable to update employee.",

@@ -1,10 +1,11 @@
-import { notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 
 import AccountSettingsContent from "@/components/dashboard/Settings/AccountSettings/AccountSettingsContent";
-
-import { getCurrentUser } from "@/server/user/getCurrentUser";
-import { getUserSessions } from "@/server/user/getUserSessions";
 import { DashboardPageHeader } from "@/components/dashboard/dashboardPageHeader";
+
+import { getAuthContext } from "@/server/auth/getAuthContext";
+import { getAccountSettingsUser } from "@/server/user/getAccountSettingsUser";
+import { getUserSessions } from "@/server/user/getUserSessions";
 
 type Props = {
   params: Promise<{
@@ -13,13 +14,22 @@ type Props = {
 };
 
 const AccountSettings = async ({ params: _params }: Props) => {
-  const user = await getCurrentUser();
+  const authContext = await getAuthContext();
 
-  if (!user) {
-    notFound();
+  if (!authContext) {
+    redirect("/login");
   }
 
-  const sessions = await getUserSessions();
+  const { user } = authContext;
+
+  const [accountUser, sessions] = await Promise.all([
+    getAccountSettingsUser(user.id),
+    getUserSessions(),
+  ]);
+
+  if (!accountUser) {
+    redirect("/login");
+  }
 
   return (
     <div className="w-full max-w-2xl">
@@ -29,8 +39,8 @@ const AccountSettings = async ({ params: _params }: Props) => {
       />
 
       <AccountSettingsContent
-        user={user}
-        lastPasswordChangedAt={user.lastPasswordChangedAt}
+        user={accountUser}
+        lastPasswordChangedAt={accountUser.lastPasswordChangedAt}
         sessions={sessions}
       />
     </div>

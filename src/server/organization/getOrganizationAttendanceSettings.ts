@@ -1,39 +1,33 @@
-"use server";
+import "server-only";
 
 import { prisma } from "@/lib/prisma";
 
+import { ORGANIZATION_DEFAULT_SETTINGS } from "@/constants/organizationDefaultSettings";
 import { updateAttendanceSettingsSchema } from "@/validators/organization/settings/attendance";
 
-import { getSession } from "../user/getSession";
-import { ORGANIZATION_DEFAULT_SETTINGS } from "@/constants/organizationDefaultSettings";
+type GetOrganizationAttendanceSettingsParams = {
+  organizationId: string;
+};
 
-export async function getOrganizationAttendanceSettings() {
-  const session = await getSession();
-
-  if (!session) {
-    return null;
-  }
-
-  const organizationId =
-    session.session.activeOrganizationId;
-
+export async function getOrganizationAttendanceSettings({
+  organizationId,
+}: GetOrganizationAttendanceSettingsParams) {
   if (!organizationId) {
     return null;
   }
 
-  const settings =
-    await prisma.organizationAttendanceSettings.findUnique({
-      where: {
-        organizationId,
-      },
-      select: {
-        officeStartTime: true,
-        officeEndTime: true,
-        gracePeriod: true,
-        workingDays: true,
-        workingSaturdays: true,
-      },
-    });
+  const settings = await prisma.organizationAttendanceSettings.findUnique({
+    where: {
+      organizationId,
+    },
+    select: {
+      officeStartTime: true,
+      officeEndTime: true,
+      gracePeriod: true,
+      workingDays: true,
+      workingSaturdays: true,
+    },
+  });
 
   /**
    * No database settings yet.
@@ -43,8 +37,7 @@ export async function getOrganizationAttendanceSettings() {
     return ORGANIZATION_DEFAULT_SETTINGS.attendance;
   }
 
-  const parsed =
-    updateAttendanceSettingsSchema.safeParse(settings);
+  const parsed = updateAttendanceSettingsSchema.safeParse(settings);
 
   if (!parsed.success) {
     console.error(

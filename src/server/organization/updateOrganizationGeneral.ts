@@ -1,8 +1,5 @@
 "use server";
 
-import { headers } from "next/headers";
-
-import { auth } from "@/lib/auth";
 import {
   actionResponse,
   ACTION_STATUS,
@@ -15,7 +12,7 @@ import {
   type UpdateOrganizationGeneralInput,
 } from "@/validators/organization/settings/general";
 
-import { getSession } from "../user/getSession";
+import { getAuthContext } from "../auth/getAuthContext";
 
 type UpdatedOrganization = {
   id: string;
@@ -28,16 +25,26 @@ type UpdatedOrganization = {
 export async function updateOrganizationGeneral(
   values: UpdateOrganizationGeneralInput,
 ): Promise<ActionResult<UpdatedOrganization>> {
+  // 1. Validate input first
+  const validation =
+    updateOrganizationGeneralSchema.safeParse(values);
+
+  if (!validation.success) {
+    return actionResponse(
+      ACTION_STATUS.VALIDATION_ERROR,
+      "Please correct the highlighted fields.",
+      "VALIDATION_ERROR",
+      validation.error.flatten().fieldErrors,
+    );
+  }
+
+  const data = validation.data;
+
   try {
-    // --------------------------------------------------
-    // 1. Get current session
-    // --------------------------------------------------
+    // 2. Get authenticated user/session
+    const authContext = await getAuthContext();
 
-    const requestHeaders = await headers();
-
-    const session = await getSession();
-
-    if (!session?.user) {
+    if (!authContext) {
       return actionResponse(
         ACTION_STATUS.UNAUTHORIZED,
         "You must be logged in.",
@@ -45,15 +52,13 @@ export async function updateOrganizationGeneral(
       );
     }
 
-    // --------------------------------------------------
-    // 2. Get active organization member
-    // --------------------------------------------------
+    const { session, user } = authContext;
 
-    const activeMember = await auth.api.getActiveMember({
-      headers: requestHeaders,
-    });
+    // 3. Get active organization
+    const organizationId =
+      session.activeOrganizationId;
 
-    if (!activeMember) {
+    if (!organizationId) {
       return actionResponse(
         ACTION_STATUS.NOT_FOUND,
         "No active organization found.",
@@ -61,13 +66,26 @@ export async function updateOrganizationGeneral(
       );
     }
 
-    const organizationId = activeMember.organizationId;
+    // 4. Verify membership and permission
+    const member = await prisma.member.findFirst({
+      where: {
+        organizationId,
+        userId: user.id,
+      },
+      select: {
+        role: true,
+      },
+    });
 
-    // --------------------------------------------------
-    // 3. Check organization permission
-    // --------------------------------------------------
+    if (!member) {
+      return actionResponse(
+        ACTION_STATUS.FORBIDDEN,
+        "You do not have access to this organization.",
+        "FORBIDDEN",
+      );
+    }
 
-    if (activeMember.role !== "owner" && activeMember.role !== "admin") {
+    if (member.role !== "owner" && member.role !== "admin") {
       return actionResponse(
         ACTION_STATUS.FORBIDDEN,
         "Only organization admins and owners can update organization settings.",
@@ -75,78 +93,40 @@ export async function updateOrganizationGeneral(
       );
     }
 
-    // --------------------------------------------------
-    // 4. Validate input
-    // --------------------------------------------------
+    // 5. Update organization
+    const updatedOrganization =
+      await prisma.organization.update({
+        where: {
+          id: organizationId,
+        },
 
-    const validation = updateOrganizationGeneralSchema.safeParse(values);
+        data: {
+          name: data.name,
+          email: data.email || null,
+          phone: data.phone || null,
+          address: data.address || null,
+        },
 
-    if (!validation.success) {
-      return actionResponse(
-        ACTION_STATUS.VALIDATION_ERROR,
-        "Please correct the highlighted fields.",
-        "VALIDATION_ERROR",
-        validation.error.flatten().fieldErrors,
-      );
-    }
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          address: true,
+        },
+      });
 
-    const data = validation.data;
-
-    // --------------------------------------------------
-    // 5. Check organization exists
-    // --------------------------------------------------
-
-    const organization = await prisma.organization.findUnique({
-      where: {
-        id: organizationId,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (!organization) {
-      return actionResponse(
-        ACTION_STATUS.NOT_FOUND,
-        "Organization not found.",
-        "ORGANIZATION_NOT_FOUND",
-      );
-    }
-
-    // --------------------------------------------------
-    // 6. Update organization
-    // --------------------------------------------------
-
-    const updatedOrganization = await prisma.organization.update({
-      where: {
-        id: organizationId,
-      },
-      data: {
-        name: data.name,
-        email: data.email || null,
-        phone: data.phone || null,
-        address: data.address || null,
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        address: true,
-      },
-    });
-
-    // --------------------------------------------------
-    // 7. Return success
-    // --------------------------------------------------
-
+    // 6. Return success
     return actionResponse(
       ACTION_STATUS.OK,
       updatedOrganization,
       "Your organization information has been updated.",
     );
   } catch (error) {
-    console.error("[updateOrganizationGeneral] unexpected error:", error);
+    console.error(
+      "[updateOrganizationGeneral] unexpected error:",
+      error,
+    );
 
     return actionResponse(
       ACTION_STATUS.INTERNAL_SERVER_ERROR,

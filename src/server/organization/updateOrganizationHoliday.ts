@@ -1,8 +1,5 @@
 "use server";
 
-import { headers } from "next/headers";
-
-import { auth } from "@/lib/auth";
 import {
   actionResponse,
   ACTION_STATUS,
@@ -10,11 +7,12 @@ import {
 } from "@/lib/actionResponse";
 import { prisma } from "@/lib/prisma";
 
-import { getSession } from "../user/getSession";
 import {
   UpdateOrganizationHolidayInput,
   updateOrganizationHolidaySchema,
 } from "@/validators/organization/holidays/holiday";
+
+import { getAuthContext } from "../auth/getAuthContext";
 
 type UpdateOrganizationHolidaySuccess = {
   holidayId: string;
@@ -28,7 +26,18 @@ export async function updateOrganizationHoliday(
   holidayId: string,
   input: UpdateOrganizationHolidayInput,
 ): Promise<ActionResult<UpdateOrganizationHolidaySuccess>> {
-  // 1. Validate input
+  // 1. Validate holiday ID
+  const normalizedHolidayId = holidayId?.trim();
+
+  if (!normalizedHolidayId) {
+    return actionResponse(
+      ACTION_STATUS.BAD_REQUEST,
+      "Holiday ID is required.",
+      "BAD_REQUEST",
+    );
+  }
+
+  // 2. Validate input
   const parsed = updateOrganizationHolidaySchema.safeParse(input);
 
   if (!parsed.success) {
@@ -43,12 +52,10 @@ export async function updateOrganizationHoliday(
   const { name, date, description } = parsed.data;
 
   try {
-    const requestHeaders = await headers();
+    // 3. Get authenticated user/session
+    const authContext = await getAuthContext();
 
-    // 2. Check authentication
-    const session = await getSession();
-
-    if (!session?.user) {
+    if (!authContext) {
       return actionResponse(
         ACTION_STATUS.UNAUTHORIZED,
         "You must be logged in to edit an organization holiday.",
@@ -56,12 +63,12 @@ export async function updateOrganizationHoliday(
       );
     }
 
-    // 3. Get active organization
-    const activeMember = await auth.api.getActiveMember({
-      headers: requestHeaders,
-    });
+    const { session, user } = authContext;
 
-    if (!activeMember) {
+    // 4. Get active organization
+    const organizationId = session.activeOrganizationId;
+
+    if (!organizationId) {
       return actionResponse(
         ACTION_STATUS.FORBIDDEN,
         "You must have an active organization to edit a holiday.",
@@ -69,10 +76,26 @@ export async function updateOrganizationHoliday(
       );
     }
 
-    const organizationId = activeMember.organizationId;
+    // 5. Verify membership and permission
+    const member = await prisma.member.findFirst({
+      where: {
+        organizationId,
+        userId: user.id,
+      },
+      select: {
+        role: true,
+      },
+    });
 
-    // 4. Only owner/admin can edit holidays
-    if (activeMember.role !== "owner" && activeMember.role !== "admin") {
+    if (!member) {
+      return actionResponse(
+        ACTION_STATUS.FORBIDDEN,
+        "You do not have access to this organization.",
+        "FORBIDDEN",
+      );
+    }
+
+    if (member.role !== "owner" && member.role !== "admin") {
       return actionResponse(
         ACTION_STATUS.FORBIDDEN,
         "Only organization owners and admins can edit holidays.",
@@ -80,13 +103,13 @@ export async function updateOrganizationHoliday(
       );
     }
 
-    // 5. Normalize date
+    // 6. Normalize date
     const holidayDate = new Date(date);
 
-    // 6. Find holiday belonging to active organization
+    // 7. Verify holiday belongs to active organization
     const holiday = await prisma.organizationHoliday.findFirst({
       where: {
-        id: holidayId,
+        id: normalizedHolidayId,
         organizationId,
       },
       select: {
@@ -102,13 +125,13 @@ export async function updateOrganizationHoliday(
       );
     }
 
-    // 7. Check if another holiday already uses the new date
+    // 8. Check for another holiday on the same date
     const existingHoliday = await prisma.organizationHoliday.findFirst({
       where: {
         organizationId,
         date: holidayDate,
         NOT: {
-          id: holidayId,
+          id: normalizedHolidayId,
         },
       },
       select: {
@@ -124,16 +147,18 @@ export async function updateOrganizationHoliday(
       );
     }
 
-    // 8. Update holiday
+    // 9. Update holiday
     const updatedHoliday = await prisma.organizationHoliday.update({
       where: {
-        id: holidayId,
+        id: normalizedHolidayId,
       },
+
       data: {
         name,
         date: holidayDate,
         description: description ?? null,
       },
+
       select: {
         id: true,
         organizationId: true,
@@ -143,7 +168,7 @@ export async function updateOrganizationHoliday(
       },
     });
 
-    // 9. Return success
+    // 10. Return success
     return actionResponse(
       ACTION_STATUS.OK,
       {

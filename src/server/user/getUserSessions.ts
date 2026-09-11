@@ -1,23 +1,21 @@
-"use server";
-
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
 
-import { getSession } from "./getSession";
+import { getAuthContext } from "../auth/getAuthContext";
 
 export async function getUserSessions() {
-  const currentSession = await getSession();
+  const authContext = await getAuthContext();
 
-  if (!currentSession?.user) {
+  if (!authContext) {
     return [];
   }
 
-  const currentSessionId = currentSession.session.id;
+  const { session, user } = authContext;
 
   const sessions = await prisma.session.findMany({
     where: {
-      userId: currentSession.user.id,
+      userId: user.id,
       expiresAt: {
         gt: new Date(),
       },
@@ -35,8 +33,8 @@ export async function getUserSessions() {
     },
   });
 
-  return sessions.map((session) => ({
-    ...session,
-    isCurrent: session.id === currentSessionId,
+  return sessions.map((item) => ({
+    ...item,
+    isCurrent: item.id === session.id,
   }));
 }

@@ -1,7 +1,5 @@
 "use server";
 
-import { APIError } from "better-auth/api";
-
 import {
   actionResponse,
   ACTION_STATUS,
@@ -9,8 +7,9 @@ import {
 } from "@/lib/actionResponse";
 import { prisma } from "@/lib/prisma";
 
-import { getSession } from "../user/getSession";
 import { OrganizationEmployeeRole } from "@/types/organization/team";
+
+import { getAuthContext } from "../auth/getAuthContext";
 
 type UpdateMemberRoleInput = {
   organizationId: string;
@@ -26,11 +25,22 @@ type UpdateMemberRoleSuccess = {
 export async function updateMemberRole(
   input: UpdateMemberRoleInput,
 ): Promise<ActionResult<UpdateMemberRoleSuccess>> {
-  try {
-    // 1. Get current session
-    const session = await getSession();
+  const organizationId = input.organizationId?.trim();
+  const memberId = input.memberId?.trim();
 
-    if (!session?.user) {
+  if (!organizationId || !memberId || !input.role) {
+    return actionResponse(
+      ACTION_STATUS.BAD_REQUEST,
+      "Organization ID, member ID, and role are required.",
+      "BAD_REQUEST",
+    );
+  }
+
+  try {
+    // 1. Get authenticated user/session
+    const authContext = await getAuthContext();
+
+    if (!authContext) {
       return actionResponse(
         ACTION_STATUS.UNAUTHORIZED,
         "Please log in to continue.",
@@ -38,11 +48,32 @@ export async function updateMemberRole(
       );
     }
 
-    // 2. Check whether the current user belongs to the organization
+    const { session, user } = authContext;
+
+    // 2. Only operate on the active organization
+    const activeOrganizationId = session.activeOrganizationId;
+
+    if (!activeOrganizationId) {
+      return actionResponse(
+        ACTION_STATUS.FORBIDDEN,
+        "You must have an active organization.",
+        "ORGANIZATION_NOT_FOUND",
+      );
+    }
+
+    if (activeOrganizationId !== organizationId) {
+      return actionResponse(
+        ACTION_STATUS.FORBIDDEN,
+        "You do not have access to this organization.",
+        "FORBIDDEN",
+      );
+    }
+
+    // 3. Verify current user's membership and permission
     const currentMember = await prisma.member.findFirst({
       where: {
-        organizationId: input.organizationId,
-        userId: session.user.id,
+        organizationId: activeOrganizationId,
+        userId: user.id,
       },
       select: {
         role: true,
@@ -57,7 +88,6 @@ export async function updateMemberRole(
       );
     }
 
-    // 3. Only owner and admin can update member roles
     const isOwnerOrAdmin =
       currentMember.role === "owner" || currentMember.role === "admin";
 
@@ -72,8 +102,8 @@ export async function updateMemberRole(
     // 4. Find the member being updated
     const memberToUpdate = await prisma.member.findFirst({
       where: {
-        id: input.memberId,
-        organizationId: input.organizationId,
+        id: memberId,
+        organizationId: activeOrganizationId,
       },
       select: {
         id: true,
@@ -118,16 +148,6 @@ export async function updateMemberRole(
       "Employee role updated successfully.",
     );
   } catch (error) {
-    // 8. Handle Better Auth errors
-    if (error instanceof APIError) {
-      return actionResponse(
-        ACTION_STATUS.BAD_REQUEST,
-        error.body?.message ?? "Unable to update employee role.",
-        "BAD_REQUEST",
-      );
-    }
-
-    // 9. Handle unexpected errors
     console.error("[updateMemberRole] unexpected error:", error);
 
     return actionResponse(

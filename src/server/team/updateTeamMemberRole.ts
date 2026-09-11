@@ -1,7 +1,5 @@
 "use server";
 
-import { APIError } from "better-auth/api";
-
 import {
   actionResponse,
   ACTION_STATUS,
@@ -9,8 +7,9 @@ import {
 } from "@/lib/actionResponse";
 
 import { prisma } from "@/lib/prisma";
-import { getSession } from "../user/getSession";
 import { OrganizationEmployeeRole } from "@/types/organization/team";
+
+import { getAuthContext } from "../auth/getAuthContext";
 
 type UpdateTeamMemberRoleInput = {
   teamId: string;
@@ -29,12 +28,35 @@ export async function updateTeamMemberRole(
 ): Promise<ActionResult<UpdateTeamMemberRoleSuccess>> {
   try {
     // --------------------------------------------------
-    // 1. Get current session
+    // 1. Validate input
     // --------------------------------------------------
 
-    const session = await getSession();
+    const teamId = input.teamId?.trim();
+    const memberId = input.memberId?.trim();
 
-    if (!session?.user) {
+    if (!teamId) {
+      return actionResponse(
+        ACTION_STATUS.BAD_REQUEST,
+        "Team ID is required.",
+        "BAD_REQUEST",
+      );
+    }
+
+    if (!memberId) {
+      return actionResponse(
+        ACTION_STATUS.BAD_REQUEST,
+        "Member ID is required.",
+        "BAD_REQUEST",
+      );
+    }
+
+    // --------------------------------------------------
+    // 2. Get authenticated user
+    // --------------------------------------------------
+
+    const authContext = await getAuthContext();
+
+    if (!authContext) {
       return actionResponse(
         ACTION_STATUS.UNAUTHORIZED,
         "Please log in to continue.",
@@ -42,13 +64,15 @@ export async function updateTeamMemberRole(
       );
     }
 
+    const { user } = authContext;
+
     // --------------------------------------------------
-    // 2. Get team and derive organization
+    // 3. Get team
     // --------------------------------------------------
 
     const team = await prisma.team.findUnique({
       where: {
-        id: input.teamId,
+        id: teamId,
       },
       select: {
         id: true,
@@ -65,13 +89,13 @@ export async function updateTeamMemberRole(
     }
 
     // --------------------------------------------------
-    // 3. Check current user's organization membership
+    // 4. Verify current user's organization membership
     // --------------------------------------------------
 
     const currentMember = await prisma.member.findFirst({
       where: {
         organizationId: team.organizationId,
-        userId: session.user.id,
+        userId: user.id,
       },
       select: {
         role: true,
@@ -87,13 +111,10 @@ export async function updateTeamMemberRole(
     }
 
     // --------------------------------------------------
-    // 4. Only organization owner/admin can manage team
+    // 5. Only owner/admin can manage team
     // --------------------------------------------------
 
-    const canManageTeam =
-      currentMember.role === "owner" || currentMember.role === "admin";
-
-    if (!canManageTeam) {
+    if (currentMember.role !== "owner" && currentMember.role !== "admin") {
       return actionResponse(
         ACTION_STATUS.FORBIDDEN,
         "You don't have permission to update team member roles.",
@@ -102,18 +123,17 @@ export async function updateTeamMemberRole(
     }
 
     // --------------------------------------------------
-    // 5. Find the TeamMember
+    // 6. Find team member scoped to this team
     // --------------------------------------------------
 
     const teamMember = await prisma.teamMember.findFirst({
       where: {
-        id: input.memberId,
+        id: memberId,
         teamId: team.id,
       },
       select: {
         id: true,
         teamId: true,
-        userId: true,
         role: true,
       },
     });
@@ -127,28 +147,6 @@ export async function updateTeamMemberRole(
     }
 
     // --------------------------------------------------
-    // 6. Verify the user belongs to the same organization
-    // --------------------------------------------------
-
-    const organizationMember = await prisma.member.findFirst({
-      where: {
-        organizationId: team.organizationId,
-        userId: teamMember.userId,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (!organizationMember) {
-      return actionResponse(
-        ACTION_STATUS.FORBIDDEN,
-        "This team member does not belong to the team's organization.",
-        "FORBIDDEN",
-      );
-    }
-
-    // --------------------------------------------------
     // 7. No update necessary
     // --------------------------------------------------
 
@@ -158,7 +156,7 @@ export async function updateTeamMemberRole(
         {
           memberId: teamMember.id,
           teamId: teamMember.teamId,
-          role: teamMember.role,
+          role: teamMember.role as OrganizationEmployeeRole,
         },
         "Team member role is already set to this role.",
       );
@@ -191,19 +189,11 @@ export async function updateTeamMemberRole(
       {
         memberId: updatedMember.id,
         teamId: updatedMember.teamId,
-        role: updatedMember.role,
+        role: updatedMember.role as OrganizationEmployeeRole,
       },
       "Team member role updated successfully.",
     );
   } catch (error) {
-    if (error instanceof APIError) {
-      return actionResponse(
-        ACTION_STATUS.BAD_REQUEST,
-        error.body?.message ?? "Unable to update team member role.",
-        "BAD_REQUEST",
-      );
-    }
-
     console.error("[updateTeamMemberRole] unexpected error:", error);
 
     return actionResponse(
