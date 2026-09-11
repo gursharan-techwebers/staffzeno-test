@@ -31,7 +31,7 @@ import AddHolidayDialog from "./AddHolidayDialog";
 import DeleteHolidayDialog from "./DeleteHolidayDialog";
 
 import { OrganizationHoliday } from "@/types/organization/holiday";
-import EditHolidayDialog from "./editHolidayDialog";
+import EditHolidayDialog from "./EditHolidayDialog";
 
 type CalendarContentProps = {
   holidays: OrganizationHoliday[];
