@@ -4,10 +4,9 @@ import {
   organizationClient,
 } from "better-auth/client/plugins";
 import { stripeClient } from "@better-auth/stripe/client";
-import { env } from "@/env";
 
 export const authClient = createAuthClient({
-  baseURL: env.BETTER_AUTH_URL,
+  baseURL: process.env.NEXT_PUBLIC_APP_URL,
   plugins: [
     lastLoginMethodClient(),
     stripeClient({
