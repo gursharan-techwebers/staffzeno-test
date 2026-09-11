@@ -7,8 +7,8 @@ import { DashboardPageHeader } from "../../dashboardPageHeader";
 import { AllTeamsTable } from "./allTeamsTable";
 import EmptyState from "@/components/shared/dashboard/EmptyState";
 import CreateTeamDialog from "../CreateTeamDialog";
-import { Team } from "@/types/team/team";
 import type { OrganizationRole } from "@/server/user/getCurrentUserRole";
+import { Team } from "@/types/organization/team";
 
 type TeamsContentProps = {
   initialTeams: Team[];

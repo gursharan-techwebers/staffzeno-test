@@ -111,6 +111,8 @@ model Organization {
   attendanceSettings OrganizationAttendanceSettings?
   leaveSettings      OrganizationLeaveSettings?
   holidays           OrganizationHoliday[]
+  leaveTypes         LeaveType[]
+  leaves             Leave[]
 
   @@unique([slug])
   @@index([createdById])
@@ -158,13 +160,15 @@ model OrganizationLeaveSettings {
   organizationId String       @unique
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  monthlyPaidLeaves        Int
-  monthlyPaidHalfDayLeaves Int
-  monthlyPaidShortLeaves   Int
-  shortLeaveDuration       Int
+  monthlyPaidLeaves        Int @default(1)
+  monthlyPaidHalfDayLeaves Int @default(0)
+  monthlyPaidShortLeaves   Int @default(1)
+
+  // Maximum duration of one short leave, in minutes.
+  shortLeaveDuration Int @default(120)
 
   carryForwardEnabled    Boolean @default(false)
-  leaveEncashmentEnabled Boolean @default(false)
+  leaveEncashmentEnabled Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -176,12 +180,20 @@ model Member {
   id             String       @id
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  userId         String
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role           String       @default("member")
-  title          String?
-  createdAt      DateTime
 
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  role  String  @default("member")
+  title String?
+
+  createdAt DateTime @default(now())
+
+  leaves         Leave[]
+  leaveBalances  LeaveBalance[]
+  leaveApprovals LeaveApproval[]
+
+  @@unique([organizationId, userId])
   @@index([organizationId])
   @@index([userId])
   @@map("member")
@@ -237,7 +249,8 @@ model TeamMember {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  role TeamMemberRole @default(member)
+  role      TeamMemberRole @default(member)
+  isPrimary Boolean        @default(false)
 
   membershipKey String?
   createdAt     DateTime?
@@ -247,4 +260,143 @@ model TeamMember {
   @@index([teamId])
   @@index([userId])
   @@map("teamMember")
+}
+
+model LeaveType {
+  id             String       @id
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+
+  isPaid   Boolean @default(true)
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  leaves        Leave[]
+  leaveBalances LeaveBalance[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("leave_type")
+}
+
+model LeaveBalance {
+  id String @id
+
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  year  Int
+  month Int
+
+  allocatedFullDayMinutes Int @default(0)
+  usedFullDayMinutes      Int @default(0)
+
+  allocatedHalfDayMinutes Int @default(0)
+  usedHalfDayMinutes      Int @default(0)
+
+  allocatedShortLeaveMinutes Int @default(0)
+  usedShortLeaveMinutes      Int @default(0)
+
+  carryForwardMinutes Int @default(0)
+  adjustedMinutes     Int @default(0)
+
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  leaveType   LeaveType? @relation(fields: [leaveTypeId], references: [id])
+  leaveTypeId String?
+
+  @@unique([memberId, year, month])
+  @@index([memberId, year, month])
+  @@map("leave_balance")
+}
+
+enum LeaveDuration {
+  FULL_DAY
+  HALF_DAY
+  SHORT_LEAVE
+}
+
+enum HalfDayPeriod {
+  FIRST_HALF
+  SECOND_HALF
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model Leave {
+  id String @id
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  leaveTypeId String
+  leaveType   LeaveType @relation(fields: [leaveTypeId], references: [id], onDelete: Restrict)
+
+  startDate DateTime
+  endDate   DateTime
+
+  duration LeaveDuration
+
+  halfDayPeriod HalfDayPeriod?
+
+  startTime String?
+  endTime   String?
+
+  requestedMinutes Int
+
+  reason String?
+
+  status LeaveStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  approvals LeaveApproval[]
+
+  @@index([organizationId, memberId, startDate])
+  @@index([organizationId, status])
+  @@index([memberId, status])
+  @@index([leaveTypeId])
+  @@map("leave")
+}
+
+enum LeaveApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model LeaveApproval {
+  id String @id
+
+  leaveId String
+  leave   Leave  @relation(fields: [leaveId], references: [id], onDelete: Cascade)
+
+  approverMemberId String
+  approverMember   Member @relation(fields: [approverMemberId], references: [id], onDelete: Restrict)
+
+  status LeaveApprovalStatus @default(PENDING)
+
+  comment String?
+  actedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([leaveId, approverMemberId])
+  @@index([approverMemberId, status])
+  @@map("leave_approval")
 }

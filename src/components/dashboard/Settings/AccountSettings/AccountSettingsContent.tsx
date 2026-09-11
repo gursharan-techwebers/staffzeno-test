@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { LockKeyholeIcon, UserIcon } from "lucide-react";
 
-import { DashboardPageHeader } from "@/components/dashboard/dashboardPageHeader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import ProfileSettings from "./ProfileSettings";

@@ -6,18 +6,9 @@ import {
   ClipboardListIcon,
   TriangleAlertIcon,
 } from "lucide-react";
-import {
-  usePathname,
-  useRouter,
-  useSearchParams,
-} from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import GeneralSettings from "./GeneralSettings";
 import AttendanceSettings from "./AttendanceSettings";
@@ -85,22 +76,13 @@ const OrganizationSettingsContent = ({
 
     const queryString = params.toString();
 
-    router.replace(
-      queryString
-        ? `${pathname}?${queryString}`
-        : pathname,
-      {
-        scroll: false,
-      },
-    );
+    router.replace(queryString ? `${pathname}?${queryString}` : pathname, {
+      scroll: false,
+    });
   };
 
   return (
-    <Tabs
-      value={activeTab}
-      onValueChange={handleTabChange}
-      className="w-full"
-    >
+    <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
       <TabsList>
         {/* General */}
 
@@ -145,43 +127,25 @@ const OrganizationSettingsContent = ({
 
       {/* General */}
 
-      <TabsContent
-        value="general"
-        className="mt-6"
-      >
-        <GeneralSettings
-          organization={organization}
-        />
+      <TabsContent value="general" className="mt-6">
+        <GeneralSettings organization={organization} />
       </TabsContent>
 
       {/* Attendance */}
 
-      <TabsContent
-        value="attendance"
-        className="mt-6"
-      >
-        <AttendanceSettings
-          settings={attendanceSettings}
-        />
+      <TabsContent value="attendance" className="mt-6">
+        <AttendanceSettings settings={attendanceSettings} />
       </TabsContent>
 
       {/* Leave */}
 
-      <TabsContent
-        value="leave"
-        className="mt-6"
-      >
-        <LeaveManagementSettings
-          settings={leaveSettings}
-        />
+      <TabsContent value="leave" className="mt-6">
+        <LeaveManagementSettings settings={leaveSettings} />
       </TabsContent>
 
       {/* Danger Zone */}
 
-      <TabsContent
-        value="danger"
-        className="mt-6"
-      >
+      <TabsContent value="danger" className="mt-6">
         <DangerSettings
           organization={{
             id: organization.id,

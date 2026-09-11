@@ -11,8 +11,9 @@ import { hashPassword, verifyPassword } from "./password";
 import { sendOrganizationInvitation } from "@/sendEmails/auth/sendOrganizationInvitation";
 import { stripe } from "@better-auth/stripe";
 import Stripe from "stripe";
+import { env } from "@/env";
 
-const stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+const stripeClient = new Stripe(env.STRIPE_SECRET_KEY!, {
   apiVersion: "2026-08-26.dahlia", // Latest API version as of Stripe SDK v22.0.0
 });
 
@@ -20,7 +21,7 @@ export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: "postgresql",
   }),
-  baseURL: process.env.BETTER_AUTH_URL,
+  baseURL: env.BETTER_AUTH_URL,
   emailVerification: {
     sendOnSignUp: true,
     sendVerificationEmail: async ({ user, url }) => {
@@ -66,8 +67,8 @@ export const auth = betterAuth({
   socialProviders: {
     google: {
       prompt: "select_account consent",
-      clientId: process.env.GOOGLE_CLIENT_ID as string,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+      clientId: env.GOOGLE_CLIENT_ID as string,
+      clientSecret: env.GOOGLE_CLIENT_SECRET as string,
       accessType: "offline",
     },
   },
@@ -78,7 +79,7 @@ export const auth = betterAuth({
   plugins: [
     stripe({
       stripeClient,
-      stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET!,
+      stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET!,
       createCustomerOnSignUp: true,
     }),
     lastLoginMethod(),
@@ -122,7 +123,7 @@ export const auth = betterAuth({
           title: string;
         };
 
-        const inviteLink = `${process.env.BETTER_AUTH_URL}/accept-invitation/${data.id}`;
+        const inviteLink = `${env.BETTER_AUTH_URL}/accept-invitation/${data.id}`;
 
         await sendOrganizationInvitation({
           email: data.email,

@@ -6,8 +6,6 @@ import { getActiveOrganization } from "@/server/organization/getActiveOrganizati
 import { getOrganizationAttendanceSettings } from "@/server/organization/getOrganizationAttendanceSettings";
 import { getOrganizationLeaveSettings } from "@/server/organization/getOrganizationLeaveSettings";
 
-
-
 type Props = {
   params: Promise<{
     slug: string;

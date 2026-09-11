@@ -1,3 +1,5 @@
+import { env } from "@/env";
+import { BaseEmailProps } from "@/types/email/common";
 import {
   Body,
   Button,
@@ -12,22 +14,8 @@ import {
   Text,
 } from "react-email";
 
-type BaseEmailProps = {
-  previewText: string;
-  heading: string;
-  name?: string;
-  introText: string;
-
-  url?: string;
-  buttonText?: string;
-
-  infoText?: string;
-  troubleText?: string;
-  changedAt?: string;
-  location?: string;
-};
-
-const APP_NAME = process.env.NEXT_PUBLIC_COMPANY_NAME || "StaffZeno";
+const APP_NAME = env.NEXT_PUBLIC_COMPANY_NAME || "StaffZeno";
+const APP_LOGO_URL = env.APP_LOGO_URL;
 
 export function BaseEmailTemplate({
   previewText,
@@ -53,7 +41,7 @@ export function BaseEmailTemplate({
           <Section style={styles.content}>
             <Img
               style={styles.logo}
-              src={process.env.APP_LOGO_URL}
+              src={APP_LOGO_URL}
               alt={APP_NAME}
               width={110}
               className="block"

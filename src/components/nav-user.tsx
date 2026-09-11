@@ -1,7 +1,6 @@
 "use client";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import SharedAvatar from "./shared/SharedAvatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,11 +37,10 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import Loader from "./shared/Loader";
 import { getInitials } from "@/lib/utils";
-import Link from "next/link";
 import { useTheme } from "next-themes";
-import { DashboardLink } from "./dashboard/DashboardLink";
+import Link from "next/link";
+import { Spinner } from "./ui/spinner";
 
 type NavUserProps = {
   user: {
@@ -101,7 +99,7 @@ export function NavUser({ user, organizationSlug }: NavUserProps) {
           <DropdownMenuTrigger asChild>
             {isLoggingOut ? (
               <div className="w-full h-12 bg-sidebar-accent rounded-2xl flex items-center justify-center border text-sm gap-2 font-medium">
-                <Loader />
+                <Spinner className="size-5" />
                 Logging out...
               </div>
             ) : (
@@ -131,10 +129,11 @@ export function NavUser({ user, organizationSlug }: NavUserProps) {
           >
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                <Avatar className="h-8 w-8">
+                <Avatar className="size-9.5 ring-1 ring-border transition-all group-hover:ring-2 group-hover:ring-primary/30">
                   <AvatarImage src={user.image ?? undefined} alt={user.name} />
-                  <AvatarFallback>
-                    <SharedAvatar title={getInitials(user.name)} />
+
+                  <AvatarFallback className="bg-muted text-sm font-medium">
+                    {getInitials(user.name)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
@@ -156,12 +155,12 @@ export function NavUser({ user, organizationSlug }: NavUserProps) {
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DashboardLink href={`/org/${organizationSlug}/account-settings`}>
+              <Link href={`/org/${organizationSlug}/account-settings`}>
                 <DropdownMenuItem>
                   <BadgeCheckIcon />
                   Account Settings
                 </DropdownMenuItem>
-              </DashboardLink>
+              </Link>
               {/* <DropdownMenuItem>
                 <CreditCardIcon />
                 Billing
@@ -208,7 +207,7 @@ export function NavUser({ user, organizationSlug }: NavUserProps) {
 
             <DropdownMenuItem onClick={onLogoutClick}>
               {isLoggingOut ? (
-                <Loader />
+                <Spinner className="size-5" />
               ) : (
                 <>
                   <LogOutIcon />

@@ -11,37 +11,12 @@ import {
 import { prisma } from "@/lib/prisma";
 
 import { getSession } from "../user/getSession";
-
-export type OrganizationEmployeeRole = "admin" | "member";
-
-export type OrganizationEmployee = {
-  id: string;
-  userId: string;
-  role: OrganizationEmployeeRole;
-  title: string | null;
-  teamId: string | null;
-  createdAt: Date;
-
-  user: {
-    id: string;
-    name: string;
-    email: string;
-    image: string | null;
-  };
-
-  teams: {
-    id: string;
-    name: string;
-  }[];
-};
+import { OrganizationEmployee, OrganizationEmployeeRole } from "@/types/organization/team";
 
 export async function getOrganizationEmployees(): Promise<
   ActionResult<OrganizationEmployee[]>
 > {
   try {
-    // --------------------------------------------------
-    // 1. Get current session
-    // --------------------------------------------------
     const requestHeaders = await headers();
 
     const session = await getSession();
@@ -54,9 +29,6 @@ export async function getOrganizationEmployees(): Promise<
       );
     }
 
-    // --------------------------------------------------
-    // 2. Get active organization member
-    // --------------------------------------------------
     const activeMember = await auth.api.getActiveMember({
       headers: requestHeaders,
     });
@@ -71,9 +43,6 @@ export async function getOrganizationEmployees(): Promise<
 
     const organizationId = activeMember.organizationId;
 
-    // --------------------------------------------------
-    // 3. Only owner and admin can view employees
-    // --------------------------------------------------
     if (activeMember.role !== "owner" && activeMember.role !== "admin") {
       return actionResponse(
         ACTION_STATUS.FORBIDDEN,
@@ -82,9 +51,6 @@ export async function getOrganizationEmployees(): Promise<
       );
     }
 
-    // --------------------------------------------------
-    // 4. Get organization members
-    // --------------------------------------------------
     const members = await prisma.member.findMany({
       where: {
         organizationId,
@@ -135,9 +101,6 @@ export async function getOrganizationEmployees(): Promise<
       },
     });
 
-    // --------------------------------------------------
-    // 5. Transform Prisma result
-    // --------------------------------------------------
     const employees: OrganizationEmployee[] = members.map((member) => {
       const teams = member.user.teammembers.map(
         (teamMember) => teamMember.team,
@@ -169,9 +132,6 @@ export async function getOrganizationEmployees(): Promise<
       };
     });
 
-    // --------------------------------------------------
-    // 6. Return employees
-    // --------------------------------------------------
     return actionResponse(
       ACTION_STATUS.OK,
       employees,

@@ -4,16 +4,7 @@ import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-
-type EmptyStateProps = {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-  actionIcon?: React.ReactNode;
-  actionLabel?: string;
-  actionHref?: string;
-  onAction?: () => void;
-};
+import { EmptyStateProps } from "@/types/organization/common";
 
 const EmptyState = ({
   icon,

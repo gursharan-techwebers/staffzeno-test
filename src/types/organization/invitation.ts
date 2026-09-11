@@ -8,3 +8,8 @@ export type Invitation = {
   expiresAt: Date;
   createdAt: Date;
 };
+
+export type AcceptInvitationProps = {
+  invitationId: string;
+  organizationName: string | null;
+};

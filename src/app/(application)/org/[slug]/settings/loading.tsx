@@ -5,7 +5,6 @@ const Loading = () => {
   return (
     <>
       <DashboardPageHeaderSkeleton />
-
       <OrganizationSettingsContentSkeleton />
     </>
   );

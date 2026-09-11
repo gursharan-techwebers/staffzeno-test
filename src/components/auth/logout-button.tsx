@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { logoutUser } from "@/server/auth/logout";
 
-export function LogutButton() {
+export function LogoutButton() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const router = useRouter();

@@ -12,18 +12,19 @@ import {
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "../user/getSession";
+import { OrganizationEmployeeRole } from "@/types/organization/team";
 
 type UpdateOrganizationEmployeeInput = {
   organizationId: string;
   memberId: string;
-  role: "admin" | "member";
+  role: OrganizationEmployeeRole;
   teamId: string | null;
   title: string;
 };
 
 type UpdateOrganizationEmployeeSuccess = {
   memberId: string;
-  role: "admin" | "member";
+  role: OrganizationEmployeeRole;
   teamId: string | null;
   title: string | null;
 };
@@ -32,9 +33,6 @@ export async function updateOrganizationEmployee(
   input: UpdateOrganizationEmployeeInput,
 ): Promise<ActionResult<UpdateOrganizationEmployeeSuccess>> {
   try {
-    // --------------------------------------------------
-    // 1. Get current session
-    // --------------------------------------------------
     const session = await getSession();
 
     if (!session?.user) {
@@ -45,9 +43,6 @@ export async function updateOrganizationEmployee(
       );
     }
 
-    // --------------------------------------------------
-    // 2. Validate organization role
-    // --------------------------------------------------
     if (input.role !== "admin" && input.role !== "member") {
       return actionResponse(
         ACTION_STATUS.BAD_REQUEST,
@@ -56,9 +51,6 @@ export async function updateOrganizationEmployee(
       );
     }
 
-    // --------------------------------------------------
-    // 3. Validate title
-    // --------------------------------------------------
     const title = input.title.trim();
 
     if (title.length > 100) {
@@ -69,14 +61,8 @@ export async function updateOrganizationEmployee(
       );
     }
 
-    // --------------------------------------------------
-    // 4. Get request headers for Better Auth
-    // --------------------------------------------------
     const requestHeaders = await headers();
 
-    // --------------------------------------------------
-    // 5. Check current user's organization membership
-    // --------------------------------------------------
     const currentMember = await prisma.member.findFirst({
       where: {
         organizationId: input.organizationId,
@@ -95,9 +81,6 @@ export async function updateOrganizationEmployee(
       );
     }
 
-    // --------------------------------------------------
-    // 6. Only owner/admin can manage employees
-    // --------------------------------------------------
     if (currentMember.role !== "owner" && currentMember.role !== "admin") {
       return actionResponse(
         ACTION_STATUS.FORBIDDEN,
@@ -106,9 +89,6 @@ export async function updateOrganizationEmployee(
       );
     }
 
-    // --------------------------------------------------
-    // 7. Find employee
-    // --------------------------------------------------
     const memberToUpdate = await prisma.member.findFirst({
       where: {
         id: input.memberId,
@@ -129,9 +109,6 @@ export async function updateOrganizationEmployee(
       );
     }
 
-    // --------------------------------------------------
-    // 8. Never modify organization owner
-    // --------------------------------------------------
     if (memberToUpdate.role === "owner") {
       return actionResponse(
         ACTION_STATUS.FORBIDDEN,
@@ -140,9 +117,6 @@ export async function updateOrganizationEmployee(
       );
     }
 
-    // --------------------------------------------------
-    // 9. Validate selected team
-    // --------------------------------------------------
     if (input.teamId) {
       const team = await prisma.team.findFirst({
         where: {
@@ -163,9 +137,6 @@ export async function updateOrganizationEmployee(
       }
     }
 
-    // --------------------------------------------------
-    // 10. Update organization role and title
-    // --------------------------------------------------
     const updatedMember = await prisma.member.update({
       where: {
         id: memberToUpdate.id,
@@ -181,9 +152,6 @@ export async function updateOrganizationEmployee(
       },
     });
 
-    // --------------------------------------------------
-    // 11. Get existing team memberships
-    // --------------------------------------------------
     const existingTeamMemberships = await prisma.teamMember.findMany({
       where: {
         userId: memberToUpdate.userId,
@@ -209,9 +177,6 @@ export async function updateOrganizationEmployee(
       });
     }
 
-    // --------------------------------------------------
-    // 13. Add employee to selected team
-    // --------------------------------------------------
     if (input.teamId) {
       await auth.api.addTeamMember({
         body: {
@@ -222,9 +187,6 @@ export async function updateOrganizationEmployee(
       });
     }
 
-    // --------------------------------------------------
-    // 14. Return updated employee data
-    // --------------------------------------------------
     return actionResponse(
       ACTION_STATUS.OK,
       {
@@ -236,9 +198,6 @@ export async function updateOrganizationEmployee(
       "Employee updated successfully.",
     );
   } catch (error) {
-    // --------------------------------------------------
-    // Better Auth errors
-    // --------------------------------------------------
     if (error instanceof APIError) {
       return actionResponse(
         ACTION_STATUS.BAD_REQUEST,
@@ -247,9 +206,6 @@ export async function updateOrganizationEmployee(
       );
     }
 
-    // --------------------------------------------------
-    // Unexpected errors
-    // --------------------------------------------------
     console.error("[updateOrganizationEmployee] unexpected error:", error);
 
     return actionResponse(

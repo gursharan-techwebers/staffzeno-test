@@ -1,7 +1,8 @@
-import { InvitationEmailProps } from "@/types/organization/emails/organizationEmails";
+import { InvitationEmailProps } from "@/types/email/organization";
 import BaseEmailTemplate from "./baseEmail";
+import { env } from "@/env";
 
-const APP_NAME = process.env.NEXT_PUBLIC_COMPANY_NAME || "StaffZeno";
+const APP_NAME = env.NEXT_PUBLIC_COMPANY_NAME || "StaffZeno";
 
 export function invitationEmailTemplate({
   email,

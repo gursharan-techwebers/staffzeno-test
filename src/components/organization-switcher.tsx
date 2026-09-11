@@ -22,7 +22,6 @@ import {
 
 import { ChevronsUpDownIcon, PlusIcon } from "lucide-react";
 
-import SharedAvatar from "./shared/SharedAvatar";
 import CreateOrganizationDialog from "./organization/create-organization-dialog";
 import { Spinner } from "./ui/spinner";
 
@@ -30,6 +29,7 @@ import { setActiveOrganizationBySlug } from "@/server/organization/setActiveOrga
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import Image from "next/image";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 
 type Organization = {
   id: string;
@@ -170,13 +170,20 @@ export function OrganizationSwitcher({
                   onClick={() => handleOrganizationChange(organization)}
                   className="gap-2 px-2 py-3"
                 >
-                  <div className="flex size-8 items-center justify-center rounded-full border">
-                    {organization.logo ? (
-                      organization.logo
-                    ) : (
-                      <SharedAvatar title={organization.name[0]} />
-                    )}
-                  </div>
+                  <Avatar className="size-8 ring-1 ring-border transition-all group-hover:ring-2 group-hover:ring-primary/30">
+                    <AvatarImage
+                      src={
+                        typeof organization.logo === "string"
+                          ? organization.logo
+                          : undefined
+                      }
+                      alt={organization.name}
+                    />
+
+                    <AvatarFallback className="bg-muted text-sm font-medium">
+                      {organization.name.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
 
                   <span className="flex-1">{organization.name}</span>
 

@@ -41,17 +41,13 @@ import {
   inviteOrganizationMember,
   type InviteMemberSuccess,
 } from "@/server/organization/inviteOrganizationMember";
-
-type Team = {
-  id: string;
-  name: string;
-};
+import { TeamOption } from "@/types/organization/team";
 
 type InviteMemberDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onInvitationCreated: (invitation: InviteMemberSuccess) => void;
-  teams: Team[];
+  teams: TeamOption[];
   defaultTeamId: string | null;
 };
 

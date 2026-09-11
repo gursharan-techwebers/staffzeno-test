@@ -12,12 +12,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-import {
-  Field,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field";
-
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -36,32 +31,28 @@ import { toast } from "sonner";
 
 import { updateOrganizationEmployee } from "@/server/organization/updateOrganizationEmployee";
 
-import type { OrganizationEmployee } from "@/server/organization/getOrganizationEmployees";
-
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 
 import { TitleSchemaInput } from "@/validators/organization/common";
 import { UserProfile } from "../UserProfile";
 import UserNameAndTitle from "@/components/shared/dashboard/UserNameAndTitle";
-
-type EmployeeRole = "admin" | "member";
-
-type Team = {
-  id: string;
-  name: string;
-};
+import {
+  OrganizationEmployee,
+  OrganizationEmployeeRole,
+  TeamOption,
+} from "@/types/organization/team";
 
 type ManageEmployeeDialogProps = {
   employee: OrganizationEmployee | null;
   organizationId: string;
-  teams: Team[];
+  teams: TeamOption[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onEmployeeUpdated: (
     memberId: string,
     updates: {
-      role: EmployeeRole;
+      role: OrganizationEmployeeRole;
       teamId: string | null;
       title: TitleSchemaInput;
     },
@@ -76,7 +67,7 @@ export function ManageEmployeeDialog({
   onOpenChange,
   onEmployeeUpdated,
 }: ManageEmployeeDialogProps) {
-  const [role, setRole] = useState<EmployeeRole>("member");
+  const [role, setRole] = useState<OrganizationEmployeeRole>("member");
 
   const [title, setTitle] = useState<TitleSchemaInput>("");
 
@@ -190,7 +181,7 @@ export function ManageEmployeeDialog({
           {/* Employee */}
           <div className="rounded-lg">
             <div className="flex items-center gap-3">
-              <UserProfile user={employee.user} title={employee.title || ""}/>
+              <UserProfile user={employee.user} title={employee.title || ""} />
               <UserNameAndTitle
                 name={employee.user.name}
                 title={employee.title || ""}
@@ -218,7 +209,9 @@ export function ManageEmployeeDialog({
 
               <Select
                 value={role}
-                onValueChange={(value) => setRole(value as EmployeeRole)}
+                onValueChange={(value) =>
+                  setRole(value as OrganizationEmployeeRole)
+                }
                 disabled={isSaving}
               >
                 <SelectTrigger>

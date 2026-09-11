@@ -9,6 +9,7 @@ import {
   type ActionResult,
 } from "@/lib/actionResponse";
 import { emailSchema } from "@/validators/auth/common";
+import { env } from "@/env";
 
 export async function requestPasswordReset(
   email: string,
@@ -27,7 +28,7 @@ export async function requestPasswordReset(
     await auth.api.requestPasswordReset({
       body: {
         email: parsed.data,
-        redirectTo: `${process.env.BETTER_AUTH_URL}/reset-password`,
+        redirectTo: `${env.BETTER_AUTH_URL}/reset-password`,
       },
     });
 

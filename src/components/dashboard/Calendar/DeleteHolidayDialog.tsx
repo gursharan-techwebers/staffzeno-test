@@ -20,14 +20,7 @@ import { Spinner } from "@/components/ui/spinner";
 
 import { deleteOrganizationHoliday } from "@/server/organization/deleteOrganizationHoliday";
 import { useState } from "react";
-
-export type OrganizationHoliday = {
-  id: string;
-  organizationId: string;
-  name: string;
-  date: Date;
-  description: string | null;
-};
+import { OrganizationHoliday } from "@/types/organization/holiday";
 
 type DeleteHolidayDialogProps = {
   open: boolean;

@@ -15,13 +15,9 @@ import { getSession } from "../user/getSession";
 import type { ActionResult } from "@/lib/actionResponse";
 import { prisma } from "@/lib/prisma";
 
-type ChangePasswordSuccess = {
-  message: string;
-};
-
 export async function changePassword(
   input: ChangePasswordInput,
-): Promise<ActionResult<ChangePasswordSuccess>> {
+): Promise<ActionResult<undefined>> {
   const parsed = changePasswordSchema.safeParse(input);
 
   if (!parsed.success) {
@@ -76,9 +72,7 @@ export async function changePassword(
 
     return actionResponse(
       ACTION_STATUS.OK,
-      {
-        message,
-      },
+      undefined,
       message,
     );
   } catch (error) {

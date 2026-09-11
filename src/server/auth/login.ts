@@ -10,15 +10,11 @@ import {
   type ActionResult,
 } from "@/lib/actionResponse";
 import { LoginInput, loginSchema } from "@/validators/auth/auth";
-
-type LoginSuccess = {
-  userId: string;
-  email: string;
-};
+import { AuthUserResult } from "@/types/auth/auth";
 
 export async function loginUser(
   input: LoginInput,
-): Promise<ActionResult<LoginSuccess>> {
+): Promise<ActionResult<AuthUserResult>> {
   const parsed = loginSchema.safeParse(input);
 
   if (!parsed.success) {

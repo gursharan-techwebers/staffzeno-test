@@ -9,13 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 
 import { acceptOrganizationInvitation } from "@/server/organization/acceptOrganizationInvitation";
+import { AcceptInvitationProps } from "@/types/organization/invitation";
 
-type Props = {
-  invitationId: string;
-  organizationName: string | null;
-};
-
-const AcceptInvitation = ({ invitationId, organizationName }: Props) => {
+const AcceptInvitation = ({ invitationId, organizationName }: AcceptInvitationProps) => {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [redirecting, setRedirecting] = useState(false);

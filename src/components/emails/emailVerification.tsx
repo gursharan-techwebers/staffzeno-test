@@ -1,7 +1,8 @@
-import { VerificationEmailProps } from "@/types/auth/emails/authEmails";
+import { VerificationEmailProps } from "@/types/email/auth";
 import BaseEmailTemplate from "./baseEmail";
+import { env } from "@/env";
 
-const APP_NAME = process.env.NEXT_PUBLIC_COMPANY_NAME || "StaffZeno";
+const APP_NAME = env.NEXT_PUBLIC_COMPANY_NAME || "StaffZeno";
 
 export function verificationEmailTemplate({
   name,

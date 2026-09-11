@@ -1,6 +1,7 @@
 import { passwordResetConfirmationEmailTemplate } from "@/components/emails/resetPassword";
+import { env } from "@/env";
 import { resend } from "@/lib/resend";
-import { PasswordResetConfirmationEmailProps } from "@/types/auth/emails/authEmails";
+import { PasswordResetConfirmationEmailProps } from "@/types/email/auth";
 
 export const sendPasswordResetConfirmation = async ({
   name,
@@ -9,7 +10,7 @@ export const sendPasswordResetConfirmation = async ({
 }: PasswordResetConfirmationEmailProps) => {
   try {
     const { data, error } = await resend.emails.send({
-      from: process.env.EMAIL_FROM || "StaffZeno <onboarding@resend.dev>",
+      from: env.EMAIL_FROM || "StaffZeno <onboarding@resend.dev>",
       to: "gursharan.techwebers@gmail.com",
       subject: "Your StaffZeno password has been changed",
       react: passwordResetConfirmationEmailTemplate({

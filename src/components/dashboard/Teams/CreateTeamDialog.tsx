@@ -32,7 +32,7 @@ import {
 
 import { createTeam } from "@/server/team/createTeam";
 import { Separator } from "@/components/ui/separator";
-import { Team } from "@/types/team/team";
+import { Team } from "@/types/organization/team";
 
 type CreateTeamDialogProps = {
   open: boolean;

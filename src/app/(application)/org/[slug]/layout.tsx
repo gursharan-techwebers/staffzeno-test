@@ -16,7 +16,7 @@ import { getOrganizationTeams } from "@/server/team/getOrganizationTeams";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import DashboardContentSkeleton from "@/components/dashboard/DashboardContentSkeleton";
-import { TopLoadingBar } from "@/components/dashboard/TopLoadingBar";
+import TopLoadingBar from "@/components/TopLoadingBar";
 
 type Props = {
   children: React.ReactNode;
@@ -49,42 +49,44 @@ const DashboardLayout = async ({ children, params }: Props) => {
   ]);
 
   return (
-    <SidebarProvider>
+    <>
       <TopLoadingBar />
+      
+      <SidebarProvider>
+        <AppSidebar
+          organization={organization}
+          allUserOrganizations={allUserOrganizations}
+          organizationSlug={organization.slug}
+          user={session.user}
+          teams={teams}
+          role={membership.role}
+        />
 
-      <AppSidebar
-        organization={organization}
-        allUserOrganizations={allUserOrganizations}
-        organizationSlug={organization.slug}
-        user={session.user}
-        teams={teams}
-        role={membership.role}
-      />
+        <SidebarInset>
+          <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+            <div className="flex items-center gap-2 px-4">
+              <SidebarTrigger className="-ml-1" />
 
-      <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
-          <div className="flex items-center gap-2 px-4">
-            <SidebarTrigger className="-ml-1" />
+              <Separator
+                orientation="vertical"
+                className="mr-2 data-vertical:h-4 data-vertical:self-auto"
+              />
 
-            <Separator
-              orientation="vertical"
-              className="mr-2 data-vertical:h-4 data-vertical:self-auto"
-            />
+              <DashboardBreadcrumb
+                organizationName={organization.name}
+                teams={teams}
+              />
+            </div>
+          </header>
 
-            <DashboardBreadcrumb
-              organizationName={organization.name}
-              teams={teams}
-            />
+          <div className="mt-4 flex flex-1 flex-col gap-4 p-5 pt-0">
+            <Suspense fallback={<DashboardContentSkeleton />}>
+              {children}
+            </Suspense>
           </div>
-        </header>
-
-        <div className="mt-4 flex flex-1 flex-col gap-4 p-5 pt-0">
-          <Suspense fallback={<DashboardContentSkeleton />}>
-            {children}
-          </Suspense>
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+        </SidebarInset>
+      </SidebarProvider>
+    </>
   );
 };
 

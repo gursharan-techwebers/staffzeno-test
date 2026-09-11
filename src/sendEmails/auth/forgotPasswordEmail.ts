@@ -1,6 +1,7 @@
 import { passwordResetEmailTemplate } from "@/components/emails/forgotPassword";
+import { env } from "@/env";
 import { resend } from "@/lib/resend";
-import { VerificationEmailProps } from "@/types/auth/emails/authEmails";
+import { VerificationEmailProps } from "@/types/email/auth";
 
 export const sendPasswordReset = async ({
   name,
@@ -8,7 +9,7 @@ export const sendPasswordReset = async ({
 }: VerificationEmailProps) => {
   try {
     const { data, error } = await resend.emails.send({
-      from: process.env.EMAIL_FROM || "StaffZeno <onboarding@resend.dev>",
+      from: env.EMAIL_FROM || "StaffZeno <onboarding@resend.dev>",
       to: "gursharan.techwebers@gmail.com",
       subject: "Reset your StaffZeno password",
       react: passwordResetEmailTemplate({

@@ -10,17 +10,18 @@ import {
 
 import { prisma } from "@/lib/prisma";
 import { getSession } from "../user/getSession";
+import { OrganizationEmployeeRole } from "@/types/organization/team";
 
 type UpdateTeamMemberRoleInput = {
   teamId: string;
   memberId: string;
-  role: "admin" | "member";
+  role: OrganizationEmployeeRole;
 };
 
 type UpdateTeamMemberRoleSuccess = {
   memberId: string;
   teamId: string;
-  role: "admin" | "member";
+  role: OrganizationEmployeeRole;
 };
 
 export async function updateTeamMemberRole(

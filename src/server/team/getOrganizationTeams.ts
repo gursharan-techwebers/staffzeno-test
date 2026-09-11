@@ -2,7 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { getSession } from "../user/getSession";
-import type { Team } from "@/types/team/team";
+import { Team } from "@/types/organization/team";
 
 export async function getOrganizationTeams(): Promise<Team[]> {
   const session = await getSession();

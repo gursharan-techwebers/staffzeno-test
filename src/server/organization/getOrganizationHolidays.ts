@@ -10,14 +10,7 @@ import {
 } from "@/lib/actionResponse";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "../user/getSession";
-
-export type OrganizationHoliday = {
-  id: string;
-  organizationId: string;
-  name: string;
-  date: Date;
-  description: string | null;
-};
+import { OrganizationHoliday } from "@/types/organization/holiday";
 
 export async function getOrganizationHolidays(): Promise<
   ActionResult<OrganizationHoliday[]>

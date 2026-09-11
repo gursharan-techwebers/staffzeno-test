@@ -46,10 +46,9 @@ import { Separator } from "@/components/ui/separator";
 import { removeTeam } from "@/server/team/removeTeam";
 import { ManageTeamDialog } from "../ManageTeamDialog";
 
-import { Team } from "@/types/team/team";
-import { DashboardLink } from "../../DashboardLink";
 import { UserProfile } from "../../UserProfile";
 import UserNameAndTitle from "@/components/shared/dashboard/UserNameAndTitle";
+import { Team } from "@/types/organization/team";
 
 type TeamTableProps = {
   teams: Team[];
@@ -154,12 +153,12 @@ export function AllTeamsTable({
                   {/* Team */}
                   <TableCell>
                     <div className="min-w-0">
-                      <DashboardLink
+                      <a
                         href={`/org/${slug}/teams/${team.id}`}
                         className="truncate font-medium"
                       >
                         {team.name}
-                      </DashboardLink>
+                      </a>
                     </div>
                   </TableCell>
 

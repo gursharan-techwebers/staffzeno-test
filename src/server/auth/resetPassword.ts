@@ -15,7 +15,7 @@ import {
 
 export async function resetPassword(
   input: ResetPasswordInputApi,
-): Promise<ActionResult<null>> {
+): Promise<ActionResult<undefined>> {
   const parsed = resetPasswordSchemaApi.safeParse(input);
 
   if (!parsed.success) {
@@ -39,7 +39,7 @@ export async function resetPassword(
 
     return actionResponse(
       ACTION_STATUS.OK,
-      null,
+      undefined,
       "Your password has been reset successfully.",
     );
   } catch (error) {

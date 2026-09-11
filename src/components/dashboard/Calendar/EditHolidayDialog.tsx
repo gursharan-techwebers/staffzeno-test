@@ -21,14 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 
 import { updateOrganizationHoliday } from "@/server/organization/updateOrganizationHoliday";
-
-type OrganizationHoliday = {
-  id: string;
-  organizationId: string;
-  name: string;
-  date: Date;
-  description: string | null;
-};
+import { OrganizationHoliday } from "@/types/organization/holiday";
 
 type EditHolidayDialogProps = {
   open: boolean;

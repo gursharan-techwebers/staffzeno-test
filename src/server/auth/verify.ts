@@ -10,7 +10,7 @@ import {
 } from "@/lib/actionResponse";
 import { emailSchema } from "@/validators/auth/common";
 
-export async function verifyEmail(email: string): Promise<ActionResult<null>> {
+export async function verifyEmail(email: string): Promise<ActionResult<undefined>> {
   const parsed = emailSchema.safeParse(email);
 
   if (!parsed.success) {
@@ -30,7 +30,7 @@ export async function verifyEmail(email: string): Promise<ActionResult<null>> {
 
     return actionResponse(
       ACTION_STATUS.OK,
-      null,
+      undefined,
       "Check your inbox to verify your email.",
     );
   } catch (error) {

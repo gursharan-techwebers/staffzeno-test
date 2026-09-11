@@ -25,6 +25,7 @@ import { toast } from "sonner";
 
 import { updateTeam } from "@/server/team/updateTeam";
 import { getInitials } from "@/lib/utils";
+import { OrganizationEmployeeRole } from "@/types/organization/team";
 
 type TeamMember = {
   id: string;
@@ -32,7 +33,7 @@ type TeamMember = {
   name: string;
   email: string;
   image: string | null;
-  role: "admin" | "member";
+  role: OrganizationEmployeeRole;
 };
 
 type ManageTeamDialogProps = {

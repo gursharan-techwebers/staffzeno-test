@@ -10,11 +10,7 @@ import {
   type ActionResult,
 } from "@/lib/actionResponse";
 
-type LogoutSuccess = {
-  loggedOut: true;
-};
-
-export async function logoutUser(): Promise<ActionResult<LogoutSuccess>> {
+export async function logoutUser(): Promise<ActionResult<undefined>> {
   try {
     await auth.api.signOut({
       headers: await headers(),
@@ -22,9 +18,7 @@ export async function logoutUser(): Promise<ActionResult<LogoutSuccess>> {
 
     return actionResponse(
       ACTION_STATUS.OK,
-      {
-        loggedOut: true,
-      },
+      undefined,
       "Logout successful.",
     );
   } catch (error) {

@@ -9,15 +9,11 @@ import { DashboardPageHeader } from "@/components/dashboard/dashboardPageHeader"
 
 import type { Invitation } from "@/types/organization/invitation";
 import EmptyState from "@/components/shared/dashboard/EmptyState";
-
-type Team = {
-  id: string;
-  name: string;
-};
+import { TeamOption } from "@/types/organization/team";
 
 type InvitationContentProps = {
   invitations: Invitation[];
-  teams: Team[];
+  teams: TeamOption[];
   defaultTeamId: string;
 };
 

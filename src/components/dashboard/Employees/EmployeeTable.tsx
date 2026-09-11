@@ -44,30 +44,24 @@ import { toast } from "sonner";
 
 import { deleteMember } from "@/server/organization/deleteMember";
 
-import type { OrganizationEmployee } from "@/server/organization/getOrganizationEmployees";
-
 import { Spinner } from "@/components/ui/spinner";
 import { ManageEmployeeDialog } from "./ManageEmployeeDialog";
 import { TitleSchemaInput } from "@/validators/organization/common";
 import { Separator } from "@/components/ui/separator";
 import { UserProfile } from "../UserProfile";
 import UserNameAndTitle from "@/components/shared/dashboard/UserNameAndTitle";
-
-type Team = {
-  id: string;
-  name: string;
-};
+import { OrganizationEmployee, OrganizationEmployeeRole, TeamOption } from "@/types/organization/team";
 
 type EmployeeTableProps = {
   employees: OrganizationEmployee[];
-  teams: Team[];
+  teams: TeamOption[];
   organizationId: string;
   currentUserRole: "owner" | "admin" | "member";
   onEmployeeRemoved: (employeeId: string) => void;
   onEmployeeUpdated: (
     memberId: string,
     updates: {
-      role: "admin" | "member";
+      role: OrganizationEmployeeRole;
       teamId: string | null;
       title: TitleSchemaInput;
     },

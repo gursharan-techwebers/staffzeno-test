@@ -2,13 +2,13 @@ import AcceptInvitation from "@/components/organization/accept-invitation";
 import { getInvitationOrganization } from "@/server/organization/getInvitationOrganization";
 import { redirect } from "next/navigation";
 
-type Props = {
+const AcceptInvitationPage = async ({
+  params,
+}: {
   params: Promise<{
     invitationId: string;
   }>;
-};
-
-const AcceptInvitationPage = async ({ params }: Props) => {
+}) => {
   const { invitationId } = await params;
 
   const result = await getInvitationOrganization(invitationId);

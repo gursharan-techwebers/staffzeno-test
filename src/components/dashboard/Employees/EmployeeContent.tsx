@@ -9,18 +9,13 @@ import EmptyState from "@/components/shared/dashboard/EmptyState";
 import InviteMemberDialog from "../Invitation/InviteMemberDialog";
 import { EmployeeTable } from "./EmployeeTable";
 
-import type { OrganizationEmployee } from "@/server/organization/getOrganizationEmployees";
 import type { Invitation } from "@/types/organization/invitation";
 import type { TitleSchemaInput } from "@/validators/organization/common";
-
-type Team = {
-  id: string;
-  name: string;
-};
+import { OrganizationEmployee, OrganizationEmployeeRole, TeamOption } from "@/types/organization/team";
 
 type EmployeeContentProps = {
   employees: OrganizationEmployee[];
-  teams: Team[];
+  teams: TeamOption[];
   organizationId: string;
   currentUserRole: "owner" | "admin" | "member";
   defaultTeamId: string;
@@ -65,7 +60,7 @@ const EmployeeContent = ({
   const handleEmployeeUpdated = (
     memberId: string,
     updates: {
-      role: "admin" | "member";
+      role: OrganizationEmployeeRole;
       teamId: string | null;
       title: TitleSchemaInput;
     },

@@ -1,6 +1,7 @@
 import { verificationEmailTemplate } from "@/components/emails/emailVerification";
+import { env } from "@/env";
 import { resend } from "@/lib/resend";
-import { VerificationEmailProps } from "@/types/auth/emails/authEmails";
+import { VerificationEmailProps } from "@/types/email/auth";
 
 export const sendVerification = async ({
   name,
@@ -9,7 +10,7 @@ export const sendVerification = async ({
 }: VerificationEmailProps) => {
   try {
     const { data, error } = await resend.emails.send({
-      from: process.env.EMAIL_FROM || "StaffZeno <onboarding@resend.dev>",
+      from: env.EMAIL_FROM || "StaffZeno <onboarding@resend.dev>",
       to: "gursharan.techwebers@gmail.com",
       subject: "Verify your email address",
       react: verificationEmailTemplate({
