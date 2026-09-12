@@ -1,7 +1,6 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/server/user/getSession";
 import { Team } from "@/types/organization/team";
 
 export type OrganizationRole = "owner" | "admin" | "member";
@@ -11,40 +10,19 @@ type TeamsPageData = {
   teams: Team[];
 };
 
-export async function getTeamsPageData(): Promise<TeamsPageData | null> {
-  // Get session only once.
-  const session = await getSession();
+type GetTeamsPageDataParams = {
+  organizationId: string;
+  userId: string;
+  role: OrganizationRole;
+};
 
-  if (!session) {
-    return null;
-  }
-
-  const organizationId = session.session.activeOrganizationId;
-
-  if (!organizationId) {
-    return null;
-  }
-
-  // Get membership + role in one query.
-  const membership = await prisma.member.findFirst({
-    where: {
-      organizationId,
-      userId: session.user.id,
-    },
-    select: {
-      role: true,
-    },
-  });
-
-  if (!membership) {
-    return null;
-  }
-
-  const role = membership.role as OrganizationRole;
-
+export async function getTeamsPageData({
+  organizationId,
+  userId,
+  role,
+}: GetTeamsPageDataParams): Promise<TeamsPageData> {
   const canManageTeams = role === "owner" || role === "admin";
 
-  // Get only the teams the user is allowed to see.
   const teams = await prisma.team.findMany({
     where: canManageTeams
       ? {
@@ -54,7 +32,7 @@ export async function getTeamsPageData(): Promise<TeamsPageData | null> {
           organizationId,
           teammembers: {
             some: {
-              userId: session.user.id,
+              userId,
             },
           },
         },
