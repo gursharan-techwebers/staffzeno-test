@@ -74,7 +74,11 @@ export function LoginForm({
         description: result.message || "Login Successfully",
       });
       reset();
-      router.push("/");
+      if (result.data.organizationSlug) {
+        router.push(`/org/${result.data.organizationSlug}`);
+      } else {
+        router.push("/");
+      }
     } catch (error) {
       console.error("Login error:", error);
       toast.error("Login Failed", {

@@ -1,7 +1,7 @@
 "use server";
 
 import { APIError } from "better-auth/api";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 
 import { auth } from "@/lib/auth";
 import {
@@ -12,6 +12,8 @@ import {
 import { prisma } from "@/lib/prisma";
 
 import { getAuthContext } from "../auth/getAuthContext";
+
+const LAST_ACTIVE_ORGANIZATION_COOKIE = "staffzeno_last_org_id";
 
 type SetActiveOrganizationSuccess = {
   organizationId: string;
@@ -82,7 +84,8 @@ export async function setActiveOrganizationBySlug(
       );
     }
 
-    // Better Auth needs the request headers to update the active organization
+    // Better Auth needs the request headers
+    // to update the active organization.
     const requestHeaders = await headers();
 
     await auth.api.setActiveOrganization({
@@ -90,6 +93,17 @@ export async function setActiveOrganizationBySlug(
         organizationId: organization.id,
       },
       headers: requestHeaders,
+    });
+
+    // Save the last active organization.
+    const cookieStore = await cookies();
+
+    cookieStore.set(LAST_ACTIVE_ORGANIZATION_COOKIE, organization.id, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 365,
     });
 
     return actionResponse(
