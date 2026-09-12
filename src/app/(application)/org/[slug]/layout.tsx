@@ -1,7 +1,9 @@
 import { AppSidebar } from "@/components/app-sidebar";
 import { DashboardBreadcrumb } from "@/components/dashboard/dashboardBreadcrumb";
-import { Separator } from "@/components/ui/separator";
+import DashboardContentSkeleton from "@/components/dashboard/DashboardContentSkeleton";
+import TopLoadingBar from "@/components/TopLoadingBar";
 
+import { Separator } from "@/components/ui/separator";
 import {
   SidebarInset,
   SidebarProvider,
@@ -10,13 +12,10 @@ import {
 
 import { getDashboardContext } from "@/server/organization/getDashboardContext";
 import { getUserOrganizations } from "@/server/organization/getUserOrganizations";
+import { getSidebarTeams } from "@/server/team/getSidebarTeams";
 
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
-
-import DashboardContentSkeleton from "@/components/dashboard/DashboardContentSkeleton";
-import TopLoadingBar from "@/components/TopLoadingBar";
-import { getSidebarTeams } from "@/server/team/getSidebarTeams";
 
 type Props = {
   children: React.ReactNode;
@@ -26,13 +25,20 @@ type Props = {
 };
 
 const DashboardLayout = async ({ children, params }: Props) => {
+  const layoutStart = Date.now();
+
   const { slug } = await params;
 
-  /*
-   * Authentication + organization + membership
-   * are established once here.
-   */
+  // --------------------------------------------------
+  // Resolve authentication + organization + membership
+  // --------------------------------------------------
   const dashboard = await getDashboardContext(slug);
+
+  console.log(
+    "[STAFFZENO] DashboardLayout - getDashboardContext:",
+    Date.now() - layoutStart,
+    "ms",
+  );
 
   if (!dashboard.success) {
     if (dashboard.code === "UNAUTHORIZED") {
@@ -42,16 +48,16 @@ const DashboardLayout = async ({ children, params }: Props) => {
     redirect("/");
   }
 
-  const { session, user, organization, membership } = dashboard.data;
+  const { user, organization, membership } = dashboard.data;
 
   const canManageTeams =
     membership.role === "owner" || membership.role === "admin";
 
-  /*
-   * Only fetch data required by the dashboard shell.
-   *
-   * Sidebar teams should NOT load team members.
-   */
+  // --------------------------------------------------
+  // Load dashboard shell data in parallel
+  // --------------------------------------------------
+  const shellStart = Date.now();
+
   const [allUserOrganizations, teams] = await Promise.all([
     getUserOrganizations({
       userId: user.id,
@@ -63,6 +69,18 @@ const DashboardLayout = async ({ children, params }: Props) => {
       canManageTeams,
     }),
   ]);
+
+  console.log(
+    "[STAFFZENO] DashboardLayout - shell data:",
+    Date.now() - shellStart,
+    "ms",
+  );
+
+  console.log(
+    "[STAFFZENO] DashboardLayout - TOTAL before render:",
+    Date.now() - layoutStart,
+    "ms",
+  );
 
   return (
     <>

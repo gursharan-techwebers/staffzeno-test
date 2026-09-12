@@ -13,12 +13,20 @@ type Props = {
 };
 
 const Employees = async ({ params }: Props) => {
+  const pageStart = Date.now();
+
   const { slug } = await params;
 
   // --------------------------------------------------
   // Resolve authentication + organization + membership
   // --------------------------------------------------
   const dashboard = await getDashboardContext(slug);
+
+  console.log(
+    "[STAFFZENO] Employees - getDashboardContext:",
+    Date.now() - pageStart,
+    "ms",
+  );
 
   if (!dashboard.success) {
     if (dashboard.code === "UNAUTHORIZED") {
@@ -31,8 +39,10 @@ const Employees = async ({ params }: Props) => {
   const { organization, membership } = dashboard.data;
 
   // --------------------------------------------------
-  // Load only the data required by this page
+  // Load employee page data in parallel
   // --------------------------------------------------
+  const dataStart = Date.now();
+
   const [employeesResult, teams] = await Promise.all([
     getOrganizationEmployees({
       organizationId: organization.id,
@@ -43,6 +53,12 @@ const Employees = async ({ params }: Props) => {
       organizationId: organization.id,
     }),
   ]);
+
+  console.log(
+    "[STAFFZENO] Employees - page data:",
+    Date.now() - dataStart,
+    "ms",
+  );
 
   // --------------------------------------------------
   // Employee loading failed
@@ -64,6 +80,12 @@ const Employees = async ({ params }: Props) => {
   if (!defaultTeamId) {
     redirect("/");
   }
+
+  console.log(
+    "[STAFFZENO] Employees - TOTAL before render:",
+    Date.now() - pageStart,
+    "ms",
+  );
 
   return (
     <EmployeeContent
