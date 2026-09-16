@@ -1,7 +1,7 @@
 "use server";
 
 import { APIError } from "better-auth/api";
-import { cookies, headers } from "next/headers";
+import { headers } from "next/headers";
 
 import { auth } from "@/lib/auth";
 import {
@@ -12,8 +12,7 @@ import {
 import { prisma } from "@/lib/prisma";
 
 import { getAuthContext } from "../auth/getAuthContext";
-
-const LAST_ACTIVE_ORGANIZATION_COOKIE = "staffzeno_last_org_id";
+import { setLastActiveOrganizationCookie } from "./organizationCookie";
 
 type SetActiveOrganizationSuccess = {
   organizationId: string;
@@ -22,6 +21,7 @@ type SetActiveOrganizationSuccess = {
 
 export async function setActiveOrganizationBySlug(
   slug: string,
+  skipCookie = false,
 ): Promise<ActionResult<SetActiveOrganizationSuccess>> {
   const organizationSlug = slug?.trim();
 
@@ -46,7 +46,10 @@ export async function setActiveOrganizationBySlug(
 
     const { user } = authContext;
 
+    // ---------------------------------------------------------
     // Find organization
+    // ---------------------------------------------------------
+
     const organization = await prisma.organization.findUnique({
       where: {
         slug: organizationSlug,
@@ -65,7 +68,10 @@ export async function setActiveOrganizationBySlug(
       );
     }
 
+    // ---------------------------------------------------------
     // Verify user belongs to the organization
+    // ---------------------------------------------------------
+
     const membership = await prisma.member.findFirst({
       where: {
         organizationId: organization.id,
@@ -84,8 +90,10 @@ export async function setActiveOrganizationBySlug(
       );
     }
 
-    // Better Auth needs the request headers
-    // to update the active organization.
+    // ---------------------------------------------------------
+    // Update Better Auth active organization
+    // ---------------------------------------------------------
+
     const requestHeaders = await headers();
 
     await auth.api.setActiveOrganization({
@@ -95,16 +103,13 @@ export async function setActiveOrganizationBySlug(
       headers: requestHeaders,
     });
 
-    // Save the last active organization.
-    const cookieStore = await cookies();
+    // ---------------------------------------------------------
+    // Remember this organization for the next login
+    // ---------------------------------------------------------
 
-    cookieStore.set(LAST_ACTIVE_ORGANIZATION_COOKIE, organization.id, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 365,
-    });
+    if (!skipCookie) {
+      await setLastActiveOrganizationCookie(organization.id);
+    }
 
     return actionResponse(
       ACTION_STATUS.OK,

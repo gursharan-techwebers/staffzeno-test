@@ -30,6 +30,7 @@ export type DashboardContext = {
     name: string;
     slug: string;
     logo: string | null;
+    createdById: string;
   };
 
   membership: {
@@ -40,13 +41,13 @@ export type DashboardContext = {
 
 export const getDashboardContext = cache(
   async (slug: string): Promise<ActionResult<DashboardContext>> => {
-    const totalTimer = `getDashboardContext:total:${slug}`;
-    console.time(totalTimer);
+    // const totalTimer = `getDashboardContext:total:${slug}`;
+    // console.time(totalTimer);
 
     const organizationSlug = slug.trim();
 
     if (!organizationSlug) {
-      console.timeEnd(totalTimer);
+      // console.timeEnd(totalTimer);
 
       return actionResponse(
         ACTION_STATUS.BAD_REQUEST,
@@ -62,11 +63,11 @@ export const getDashboardContext = cache(
     // This removes the previous sequential ~900ms wait.
     // -------------------------------------------------------------------------
 
-    const authTimer = `getDashboardContext:auth:${organizationSlug}`;
-    const organizationTimer = `getDashboardContext:organization:${organizationSlug}`;
+    // const authTimer = `getDashboardContext:auth:${organizationSlug}`;
+    // const organizationTimer = `getDashboardContext:organization:${organizationSlug}`;
 
-    console.time(authTimer);
-    console.time(organizationTimer);
+    // console.time(authTimer);
+    // console.time(organizationTimer);
 
     const [authContext, organization] = await Promise.all([
       getAuthContext(),
@@ -79,19 +80,20 @@ export const getDashboardContext = cache(
           name: true,
           slug: true,
           logo: true,
+          createdById: true,
         },
       }),
     ]);
 
-    console.timeEnd(authTimer);
-    console.timeEnd(organizationTimer);
+    // console.timeEnd(authTimer);
+    // console.timeEnd(organizationTimer);
 
     // -------------------------------------------------------------------------
     // Authentication check
     // -------------------------------------------------------------------------
 
     if (!authContext) {
-      console.timeEnd(totalTimer);
+      // console.timeEnd(totalTimer);
 
       return actionResponse(
         ACTION_STATUS.UNAUTHORIZED,
@@ -107,7 +109,7 @@ export const getDashboardContext = cache(
     // -------------------------------------------------------------------------
 
     if (!organization) {
-      console.timeEnd(totalTimer);
+      // console.timeEnd(totalTimer);
 
       return actionResponse(
         ACTION_STATUS.NOT_FOUND,
@@ -122,7 +124,7 @@ export const getDashboardContext = cache(
 
     const membershipTimer = `getDashboardContext:membership:${organizationSlug}`;
 
-    console.time(membershipTimer);
+    // console.time(membershipTimer);
 
     const membership = await prisma.member.findFirst({
       where: {
@@ -135,10 +137,10 @@ export const getDashboardContext = cache(
       },
     });
 
-    console.timeEnd(membershipTimer);
+    // console.timeEnd(membershipTimer);
 
     if (!membership) {
-      console.timeEnd(totalTimer);
+      // console.timeEnd(totalTimer);
 
       return actionResponse(
         ACTION_STATUS.FORBIDDEN,
@@ -166,7 +168,7 @@ export const getDashboardContext = cache(
       },
     });
 
-    console.timeEnd(totalTimer);
+    // console.timeEnd(totalTimer);
 
     return result;
   },

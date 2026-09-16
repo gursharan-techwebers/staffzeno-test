@@ -25,8 +25,8 @@ export const updateLeaveManagementSchema = z.object({
   shortLeaveDuration: z
     .number()
     .int("Short leave duration must be a whole number")
-    .min(15, "Short leave duration must be at least 15 minutes")
-    .max(240, "Short leave duration cannot exceed 240 minutes"),
+    .min(0, "Short leave duration must be at least 0 minutes")
+    .max(120, "Short leave duration cannot exceed 120 minutes"),
 
   carryForwardEnabled: z.boolean(),
 

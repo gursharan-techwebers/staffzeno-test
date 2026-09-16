@@ -42,7 +42,7 @@ const Attendance = async ({ params }: Props) => {
         description="Before you can manage attendance, you need to configure your organization's working hours, working days, and attendance rules."
         actionIcon={<Settings2Icon className="size-4" />}
         actionLabel="Configure attendance settings"
-        actionHref={`/org/${organization.slug}/settings?tab=attendance`}
+        actionHref={`/org/${organization.slug}/settings#attendance`}
       />
     );
   }

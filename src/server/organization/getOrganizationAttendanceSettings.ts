@@ -2,7 +2,6 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 
-import { ORGANIZATION_DEFAULT_SETTINGS } from "@/constants/organizationDefaultSettings";
 import { updateAttendanceSettingsSchema } from "@/validators/organization/settings/attendance";
 
 type GetOrganizationAttendanceSettingsParams = {
@@ -29,12 +28,9 @@ export async function getOrganizationAttendanceSettings({
     },
   });
 
-  /**
-   * No database settings yet.
-   * Return organization defaults.
-   */
+  // No attendance settings configured yet.
   if (!settings) {
-    return ORGANIZATION_DEFAULT_SETTINGS.attendance;
+    return null;
   }
 
   const parsed = updateAttendanceSettingsSchema.safeParse(settings);
@@ -45,7 +41,7 @@ export async function getOrganizationAttendanceSettings({
       parsed.error.flatten(),
     );
 
-    return ORGANIZATION_DEFAULT_SETTINGS.attendance;
+    return null;
   }
 
   return parsed.data;

@@ -12,7 +12,7 @@ type GoogleLoginSuccess = {
 };
 
 export async function continueWithGoogle(
-  callbackURL: string = "/",
+  callbackURL: string = "/google/callback",
 ): Promise<ActionResult<GoogleLoginSuccess>> {
   const { error } = await authClient.signIn.social({
     provider: "google",

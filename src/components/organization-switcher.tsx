@@ -188,7 +188,7 @@ export function OrganizationSwitcher({
                   <span className="flex-1">{organization.name}</span>
 
                   {organization.id === activeOrganization.id && (
-                    <Badge variant={"outline"}>Active</Badge>
+                      <Badge variant={"outline"} className="after:size-1.5 after:bg-green-500 after:rounded-full after:ml-0.5">Active</Badge>
                   )}
                 </DropdownMenuItem>
               ))}

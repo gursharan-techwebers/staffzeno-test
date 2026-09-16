@@ -1,13 +1,14 @@
-"use client";
-
-import { useState } from "react";
 import { LockKeyholeIcon, UserIcon } from "lucide-react";
-
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import ProfileSettings from "./ProfileSettings";
 import SecuritySettings from "./SecuritySettings";
-import { SecuritySession } from "@/types/auth/session";
+
+import SettingsSection from "@/components/shared/dashboard/SettingsSection";
+import SettingsSidebar, {
+  type SettingsSidebarItem,
+} from "@/components/shared/dashboard/SettingsSidebar";
+
+import type { SecuritySession } from "@/types/auth/session";
 
 type AccountSettingsContentProps = {
   user: {
@@ -18,51 +19,54 @@ type AccountSettingsContentProps = {
     image?: string | null;
     hasPassword: boolean;
   };
+
   lastPasswordChangedAt: Date | null;
+
   sessions: SecuritySession[];
 };
+
+const accountSettingsSections = [
+  {
+    id: "profile",
+    label: "Profile",
+    icon: "user",
+  },
+  {
+    id: "security",
+    label: "Security",
+    icon: "lock",
+  },
+] satisfies SettingsSidebarItem[];
 
 const AccountSettingsContent = ({
   user,
   lastPasswordChangedAt,
   sessions,
 }: AccountSettingsContentProps) => {
-  const [activeTab, setActiveTab] = useState("profile");
-
   return (
-    <>
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList>
-          <TabsTrigger
-            value="profile"
-            className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-          >
-            <UserIcon className="size-4" />
-            Profile
-          </TabsTrigger>
+    <div className="relative flex w-full min-w-0 items-start gap-8">
+      {/* Sidebar */}
 
-          <TabsTrigger
-            value="security"
-            className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-          >
-            <LockKeyholeIcon className="size-4" />
-            Security
-          </TabsTrigger>
-        </TabsList>
+      <SettingsSidebar title="Account" items={accountSettingsSections} />
 
-        <TabsContent value="profile" className="mt-6">
-          <ProfileSettings user={user} />
-        </TabsContent>
+      {/* Settings Content */}
 
-        <TabsContent value="security" className="mt-6">
-          <SecuritySettings
-            lastPasswordChangedAt={lastPasswordChangedAt}
-            sessions={sessions}
-             hasPassword={user.hasPassword}
-          />
-        </TabsContent>
-      </Tabs>
-    </>
+      <main className="min-w-0 flex-1">
+        <div className="space-y-10">
+          <SettingsSection sectionId="profile">
+            <ProfileSettings user={user} />
+          </SettingsSection>
+
+          <SettingsSection sectionId="security">
+            <SecuritySettings
+              lastPasswordChangedAt={lastPasswordChangedAt}
+              sessions={sessions}
+              hasPassword={user.hasPassword}
+            />
+          </SettingsSection>
+        </div>
+      </main>
+    </div>
   );
 };
 

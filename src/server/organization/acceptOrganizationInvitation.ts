@@ -13,6 +13,10 @@ import { prisma } from "@/lib/prisma";
 
 import { canAcceptInvitation } from "../billing/canAcceptInvitation";
 import { getAuthContext } from "../auth/getAuthContext";
+import { sendWelcomeEmail } from "@/sendEmails/organization/sendWelcomeEmail";
+import { env } from "@/env";
+import { getOrganizationAdminsAndOwner } from "./getOrganizationAdminsAndOwner";
+import { sendNewMemberJoinedEmail } from "@/sendEmails/organization/sendNewMemberJoinedEmail";
 
 type AcceptOrganizationInvitationInput = {
   invitationId: string;
@@ -140,6 +144,7 @@ export async function acceptOrganizationInvitation(
         select: {
           id: true,
           slug: true,
+          name: true,
         },
       }),
 
@@ -287,7 +292,6 @@ export async function acceptOrganizationInvitation(
         "TEAM_MEMBERSHIP_FAILED",
       );
     }
-
     // --------------------------------------------------
     // 15. Set organization as active
     // --------------------------------------------------
@@ -299,7 +303,50 @@ export async function acceptOrganizationInvitation(
     });
 
     // --------------------------------------------------
-    // 16. Return success
+    // 16. Send welcome email to the new member
+    // --------------------------------------------------
+    try {
+      await sendWelcomeEmail({
+        email: user.email,
+        name: user.name,
+        organizationName: organization.name,
+        url: `${env.BETTER_AUTH_URL}/org/${organization.slug}`,
+      });
+    } catch (emailError) {
+      console.error(
+        "[acceptOrganizationInvitation] Failed to send welcome email:",
+        emailError,
+      );
+    }
+
+    // --------------------------------------------------
+    // 17. Notify organization admins and owner
+    // --------------------------------------------------
+    try {
+      const recipients = await getOrganizationAdminsAndOwner({
+        organizationId,
+      });
+
+      await Promise.all(
+        recipients.map((recipient) =>
+          sendNewMemberJoinedEmail({
+            email: recipient.email,
+            name: recipient.name,
+            memberName: user.name,
+            organizationName: organization.name,
+            url: `${env.BETTER_AUTH_URL}/org/${organization.slug}`,
+          }),
+        ),
+      );
+    } catch (emailError) {
+      console.error(
+        "[acceptOrganizationInvitation] Failed to send new member notification:",
+        emailError,
+      );
+    }
+
+    // --------------------------------------------------
+    // 18. Return success
     // --------------------------------------------------
     return actionResponse(
       ACTION_STATUS.OK,

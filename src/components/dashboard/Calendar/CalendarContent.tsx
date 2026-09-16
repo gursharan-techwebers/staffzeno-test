@@ -217,7 +217,7 @@ const CalendarContent = ({
           </div>
 
           {holidays.length === 0 ? (
-            <div className="flex h-full min-h-32 items-center justify-center px-5 py-6 text-center">
+            <div className="flex h-auto lg:h-full min-h-66 items-center justify-center px-5 py-6 text-center">
               <div>
                 <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-full bg-muted">
                   <CalendarDays className="size-5 text-muted-foreground" />

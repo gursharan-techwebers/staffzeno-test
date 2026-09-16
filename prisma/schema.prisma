@@ -111,7 +111,6 @@ model Organization {
   attendanceSettings OrganizationAttendanceSettings?
   leaveSettings      OrganizationLeaveSettings?
   holidays           OrganizationHoliday[]
-  leaveTypes         LeaveType[]
   leaves             Leave[]
 
   @@unique([slug])
@@ -160,15 +159,15 @@ model OrganizationLeaveSettings {
   organizationId String       @unique
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  monthlyPaidLeaves        Int @default(1)
+  monthlyPaidLeaves        Int @default(0)
   monthlyPaidHalfDayLeaves Int @default(0)
-  monthlyPaidShortLeaves   Int @default(1)
+  monthlyPaidShortLeaves   Int @default(0)
 
   // Maximum duration of one short leave, in minutes.
   shortLeaveDuration Int @default(120)
 
   carryForwardEnabled    Boolean @default(false)
-  leaveEncashmentEnabled Boolean @default(true)
+  leaveEncashmentEnabled Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -221,6 +220,7 @@ model Invitation {
 
 enum TeamMemberRole {
   member
+  // team admin
   admin
 }
 
@@ -262,28 +262,6 @@ model TeamMember {
   @@map("teamMember")
 }
 
-model LeaveType {
-  id             String       @id
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-
-  name        String
-  description String?
-
-  isPaid   Boolean @default(true)
-  isActive Boolean @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  leaves        Leave[]
-  leaveBalances LeaveBalance[]
-
-  @@unique([organizationId, name])
-  @@index([organizationId])
-  @@map("leave_type")
-}
-
 model LeaveBalance {
   id String @id
 
@@ -305,10 +283,8 @@ model LeaveBalance {
   carryForwardMinutes Int @default(0)
   adjustedMinutes     Int @default(0)
 
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  leaveType   LeaveType? @relation(fields: [leaveTypeId], references: [id])
-  leaveTypeId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([memberId, year, month])
   @@index([memberId, year, month])
@@ -317,6 +293,7 @@ model LeaveBalance {
 
 enum LeaveDuration {
   FULL_DAY
+  MULTIPLE_DAYS
   HALF_DAY
   SHORT_LEAVE
 }
@@ -342,8 +319,7 @@ model Leave {
   memberId String
   member   Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
-  leaveTypeId String
-  leaveType   LeaveType @relation(fields: [leaveTypeId], references: [id], onDelete: Restrict)
+  leaveType String
 
   startDate DateTime
   endDate   DateTime
@@ -357,7 +333,7 @@ model Leave {
 
   requestedMinutes Int
 
-  reason String?
+  reason String
 
   status LeaveStatus @default(PENDING)
 
@@ -369,7 +345,6 @@ model Leave {
   @@index([organizationId, memberId, startDate])
   @@index([organizationId, status])
   @@index([memberId, status])
-  @@index([leaveTypeId])
   @@map("leave")
 }
 

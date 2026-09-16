@@ -32,7 +32,7 @@ const AccountSettings = async ({ params: _params }: Props) => {
   }
 
   return (
-    <div className="w-full max-w-2xl">
+    <>
       <DashboardPageHeader
         title="Account Settings"
         description="Manage your personal information and account security."
@@ -43,7 +43,7 @@ const AccountSettings = async ({ params: _params }: Props) => {
         lastPasswordChangedAt={accountUser.lastPasswordChangedAt}
         sessions={sessions}
       />
-    </div>
+    </>
   );
 };
 

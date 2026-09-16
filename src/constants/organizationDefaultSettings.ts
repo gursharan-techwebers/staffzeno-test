@@ -11,32 +11,25 @@ import type { UpdateLeaveManagementInput } from "@/validators/organization/setti
  */
 export const ORGANIZATION_DEFAULT_SETTINGS = {
   attendance: {
-    officeStartTime: "09:00",
-    officeEndTime: "18:00",
-    gracePeriod: 15,
+    officeStartTime: "00:00",
+    officeEndTime: "00:01",
+    gracePeriod: 0,
 
     // Monday-Saturday are working days.
     // Sunday is the weekly day off.
-    workingDays: [
-      "monday",
-      "tuesday",
-      "wednesday",
-      "thursday",
-      "friday",
-      "saturday",
-    ] satisfies WorkingDay[],
+    workingDays: ["monday"] satisfies WorkingDay[],
 
     // All Saturdays are working by default.
     workingSaturdays: [1, 2, 3, 4, 5] satisfies WorkingSaturday[],
   } satisfies UpdateAttendanceSettingsInput,
 
   leave: {
-    monthlyPaidLeaves: 1,
+    monthlyPaidLeaves: 0,
     monthlyPaidHalfDayLeaves: 0,
-    monthlyPaidShortLeaves: 1,
-    shortLeaveDuration: 120,
+    monthlyPaidShortLeaves: 0,
+    shortLeaveDuration: 0,
     carryForwardEnabled: false,
-    leaveEncashmentEnabled: true,
+    leaveEncashmentEnabled: false,
   } satisfies UpdateLeaveManagementInput,
 } as const;
 
@@ -144,6 +137,10 @@ export const ORGANIZATION_WORKING_SATURDAYS = [
  */
 export const ORGANIZATION_SHORT_LEAVE_DURATIONS = [
   {
+    value: "0",
+    label: "0",
+  },
+  {
     value: "30",
     label: "30 minutes",
   },
@@ -160,6 +157,6 @@ export const ORGANIZATION_SHORT_LEAVE_DURATIONS = [
     label: "2 hours",
   },
 ] as const satisfies ReadonlyArray<{
-  value: "30" | "60" | "90" | "120";
+  value: "0" | "30" | "60" | "90" | "120";
   label: string;
 }>;

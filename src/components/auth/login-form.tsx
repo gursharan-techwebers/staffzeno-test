@@ -21,6 +21,7 @@ import ContinueWithGoogle from "../shared/ContinueWithGoogle";
 import { authClient } from "@/lib/auth-client";
 import { Badge } from "../ui/badge";
 import { useEffect, useState } from "react";
+import { setActiveOrganizationBySlug } from "@/server/organization/setActiveOrganizationBySlug";
 
 export function LoginForm({
   className,
@@ -73,8 +74,28 @@ export function LoginForm({
       toast.success("Login Success", {
         description: result.message || "Login Successfully",
       });
+
       reset();
+
+      // ---------------------------------------------------------
+      // Activate organization
+      // ---------------------------------------------------------
+
       if (result.data.organizationSlug) {
+        const setLastOrganizationActive = await setActiveOrganizationBySlug(
+          result.data.organizationSlug,
+        );
+
+        if (!setLastOrganizationActive.success) {
+          toast.error("Organization Activation Failed", {
+            description:
+              setLastOrganizationActive.error ||
+              "Unable to activate the organization.",
+          });
+
+          return;
+        }
+
         router.push(`/org/${result.data.organizationSlug}`);
       } else {
         router.push("/");

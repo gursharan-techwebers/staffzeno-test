@@ -13,11 +13,10 @@ export async function getOrganizationLeaveSettings({
     return null;
   }
 
-  return prisma.organizationLeaveSettings.findUnique({
+  const settings = await prisma.organizationLeaveSettings.findUnique({
     where: {
       organizationId,
     },
-
     select: {
       id: true,
       organizationId: true,
@@ -31,4 +30,11 @@ export async function getOrganizationLeaveSettings({
       updatedAt: true,
     },
   });
+
+  // No leave settings configured yet.
+  if (!settings) {
+    return null;
+  }
+
+  return settings;
 }

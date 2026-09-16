@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import CreateOrganizationDialog from "@/components/organization/create-organization-dialog";
+import { LogoutButton } from "../auth/logout-button";
 
 const OnboardingChoice = () => {
   const [confirmationOpen, setConfirmationOpen] = useState(false);
@@ -55,10 +56,12 @@ const OnboardingChoice = () => {
             Joining an existing company?
           </p>
 
-          <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+          <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground mb-4">
             Ask your company owner or administrator to invite you to their
             organization.
           </p>
+
+          <LogoutButton/>
         </div>
       </div>
 

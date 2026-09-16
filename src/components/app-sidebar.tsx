@@ -82,6 +82,7 @@ export function AppSidebar({
         title: "Dashboard",
         url: `/org/${organizationSlug}`,
         icon: <LayoutDashboardIcon />,
+        exact: true,
       },
 
       // Everyone

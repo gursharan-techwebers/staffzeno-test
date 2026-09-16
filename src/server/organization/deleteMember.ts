@@ -8,6 +8,11 @@ import {
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "../auth/getAuthContext";
 
+import { env } from "@/env";
+import { getOrganizationAdminsAndOwner } from "./getOrganizationAdminsAndOwner";
+import { sendMemberRemovedEmail } from "@/sendEmails/organization/sendMemberRemovedEmail";
+import { sendMemberRemovedAdminEmail } from "@/sendEmails/organization/sendMemberRemovedAdminEmail";
+
 export type DeleteMemberSuccess = {
   memberId: string;
 };
@@ -41,8 +46,7 @@ export async function deleteMember(
 
     const { session, user } = authContext;
 
-    // 2. Always use the authenticated active organization.
-    //    Do not trust organizationId from the client for authorization.
+    // 2. Always use the authenticated active organization
     const activeOrganizationId = session.activeOrganizationId;
 
     if (!activeOrganizationId) {
@@ -53,9 +57,8 @@ export async function deleteMember(
       );
     }
 
-    // Optional consistency check.
-    // The action was called with an organizationId, so make sure it
-    // matches the authenticated active organization.
+    // Make sure the requested organization matches
+    // the authenticated active organization.
     if (activeOrganizationId !== normalizedOrganizationId) {
       return actionResponse(
         ACTION_STATUS.FORBIDDEN,
@@ -94,18 +97,47 @@ export async function deleteMember(
       );
     }
 
-    // 4. Find the member inside the authenticated organization
-    const memberToDelete = await prisma.member.findFirst({
-      where: {
-        id: normalizedMemberId,
-        organizationId: activeOrganizationId,
-      },
-      select: {
-        id: true,
-        role: true,
-        userId: true,
-      },
-    });
+    // 4. Get the organization and member details BEFORE deletion.
+    // These details are needed for notification emails.
+    const [organization, memberToDelete] = await Promise.all([
+      prisma.organization.findUnique({
+        where: {
+          id: activeOrganizationId,
+        },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+        },
+      }),
+
+      prisma.member.findFirst({
+        where: {
+          id: normalizedMemberId,
+          organizationId: activeOrganizationId,
+        },
+        select: {
+          id: true,
+          role: true,
+          userId: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    if (!organization) {
+      return actionResponse(
+        ACTION_STATUS.NOT_FOUND,
+        "Organization not found.",
+        "NOT_FOUND",
+      );
+    }
 
     if (!memberToDelete) {
       return actionResponse(
@@ -123,6 +155,19 @@ export async function deleteMember(
         "FORBIDDEN",
       );
     }
+
+    // Prevent an admin from removing themselves accidentally.
+    if (memberToDelete.userId === user.id) {
+      return actionResponse(
+        ACTION_STATUS.FORBIDDEN,
+        "You cannot remove yourself from the organization.",
+        "FORBIDDEN",
+      );
+    }
+
+    // Store email information before deletion.
+    const removedMemberName = memberToDelete.user.name;
+    const removedMemberEmail = memberToDelete.user.email;
 
     // 6. Remove organization membership and team memberships atomically
     await prisma.$transaction(async (tx) => {
@@ -171,7 +216,48 @@ export async function deleteMember(
       });
     });
 
-    // 7. Return minimal success payload
+    // 7. Send email to the removed employee.
+    // Email failure must NOT fail the deletion.
+    try {
+      await sendMemberRemovedEmail({
+        email: removedMemberEmail,
+        name: removedMemberName,
+        organizationName: organization.name,
+      });
+    } catch (emailError) {
+      console.error(
+        "[deleteMember] Failed to send member removed email:",
+        emailError,
+      );
+    }
+
+    // 8. Notify organization admins and owner.
+    try {
+      const recipients = await getOrganizationAdminsAndOwner({
+        organizationId: activeOrganizationId,
+      });
+
+      const organizationUrl = `${env.BETTER_AUTH_URL}/org/${organization.slug}`;
+
+      await Promise.allSettled(
+        recipients.map((recipient) =>
+          sendMemberRemovedAdminEmail({
+            email: recipient.email,
+            name: recipient.name,
+            memberName: removedMemberName,
+            organizationName: organization.name,
+            url: organizationUrl,
+          }),
+        ),
+      );
+    } catch (emailError) {
+      console.error(
+        "[deleteMember] Failed to send member removal notifications:",
+        emailError,
+      );
+    }
+
+    // 9. Return success
     return actionResponse(
       ACTION_STATUS.OK,
       {

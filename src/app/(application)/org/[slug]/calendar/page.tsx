@@ -27,7 +27,7 @@ const Calendar = async ({ params }: Props) => {
     redirect("/");
   }
 
-  const { organization, user, membership } = dashboard.data;
+  const { organization, membership } = dashboard.data;
 
   const [attendanceSettings, holidaysResult] = await Promise.all([
     getOrganizationAttendanceSettings({
@@ -46,7 +46,7 @@ const Calendar = async ({ params }: Props) => {
         description="Before you can use the calendar, you need to configure your organization's working hours, working days, and attendance rules."
         actionIcon={<Settings2Icon className="size-4" />}
         actionLabel="Configure attendance settings"
-        actionHref={`/org/${organization.slug}/settings?tab=attendance`}
+        actionHref={`/org/${organization.slug}/settings#attendance`}
       />
     );
   }

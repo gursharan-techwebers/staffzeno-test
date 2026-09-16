@@ -10,9 +10,12 @@ import {
 } from "@/lib/actionResponse";
 
 import { auth } from "@/lib/auth";
+import { env } from "@/env";
 import { prisma } from "@/lib/prisma";
 
 import { OrganizationEmployeeRole } from "@/types/organization/team";
+
+import { sendOrganizationRoleChangedEmail } from "@/sendEmails/organization/sendOrganizationRoleChangedEmail";
 
 import { getAuthContext } from "../auth/getAuthContext";
 
@@ -98,7 +101,6 @@ export async function updateOrganizationEmployee(
       );
     }
 
-    // Never trust organizationId supplied by the client
     if (activeOrganizationId !== organizationId) {
       return actionResponse(
         ACTION_STATUS.FORBIDDEN,
@@ -150,6 +152,12 @@ export async function updateOrganizationEmployee(
         id: true,
         userId: true,
         role: true,
+        user: {
+          select: {
+            name: true,
+            email: true,
+          },
+        },
       },
     });
 
@@ -214,13 +222,44 @@ export async function updateOrganizationEmployee(
     });
 
     // --------------------------------------------------
-    // 9. Prepare Better Auth headers
+    // 9. Prepare change information BEFORE updating
+    // --------------------------------------------------
+
+    const previousRole = memberToUpdate.role;
+    const newRole = input.role;
+
+    const roleChanged = previousRole !== newRole;
+
+    // --------------------------------------------------
+    // 10. Get organization details
+    // --------------------------------------------------
+
+    const organization = await prisma.organization.findUnique({
+      where: {
+        id: activeOrganizationId,
+      },
+      select: {
+        name: true,
+        slug: true,
+      },
+    });
+
+    if (!organization) {
+      return actionResponse(
+        ACTION_STATUS.NOT_FOUND,
+        "Organization not found.",
+        "NOT_FOUND",
+      );
+    }
+
+    // --------------------------------------------------
+    // 11. Prepare Better Auth headers
     // --------------------------------------------------
 
     const requestHeaders = await headers();
 
     // --------------------------------------------------
-    // 10. Update employee role/title
+    // 12. Update employee role/title
     // --------------------------------------------------
 
     const updatedMember = await prisma.member.update({
@@ -239,7 +278,7 @@ export async function updateOrganizationEmployee(
     });
 
     // --------------------------------------------------
-    // 11. Remove existing team memberships
+    // 13. Remove existing team memberships
     // --------------------------------------------------
 
     for (const membership of existingTeamMemberships) {
@@ -253,7 +292,7 @@ export async function updateOrganizationEmployee(
     }
 
     // --------------------------------------------------
-    // 12. Add new team membership
+    // 14. Add new team membership
     // --------------------------------------------------
 
     if (teamId) {
@@ -267,7 +306,29 @@ export async function updateOrganizationEmployee(
     }
 
     // --------------------------------------------------
-    // 13. Return success
+    // 15. Send role changed email
+    // --------------------------------------------------
+
+    if (roleChanged) {
+      try {
+        await sendOrganizationRoleChangedEmail({
+          email: memberToUpdate.user.email,
+          name: memberToUpdate.user.name,
+          organizationName: organization.name,
+          previousRole,
+          newRole,
+          url: `${env.BETTER_AUTH_URL}/org/${organization.slug}`,
+        });
+      } catch (emailError) {
+        console.error(
+          "[updateOrganizationEmployee] Failed to send role changed email:",
+          emailError,
+        );
+      }
+    }
+
+    // --------------------------------------------------
+    // 16. Return success
     // --------------------------------------------------
 
     return actionResponse(

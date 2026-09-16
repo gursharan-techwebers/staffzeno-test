@@ -33,6 +33,7 @@ import {
 import { createOrganization } from "@/server/organization/createOrganization";
 import { Separator } from "../ui/separator";
 import { useState } from "react";
+import { setActiveOrganizationBySlug } from "@/server/organization/setActiveOrganizationBySlug";
 
 type CreateOrganizationDialogProps = {
   open: boolean;
@@ -98,6 +99,26 @@ const CreateOrganizationDialog = ({
         description: "Your organization has been created successfully.",
       });
       setRedirecting(true);
+
+      // ---------------------------------------------------------
+      // Activate organization
+      // ---------------------------------------------------------
+
+      if (result.data.slug) {
+        const setLastOrganizationActive = await setActiveOrganizationBySlug(
+          result.data.slug,
+        );
+
+        if (!setLastOrganizationActive.success) {
+          toast.error("Organization Activation Failed", {
+            description:
+              setLastOrganizationActive.error ||
+              "Unable to activate the organization.",
+          });
+          return;
+        }
+      }
+
       router.push(`/org/${result.data.slug}/settings`);
     } catch (error) {
       console.error("[CreateOrganizationDialog] error:", error);

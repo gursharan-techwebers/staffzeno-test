@@ -7,6 +7,7 @@ import { getDashboardContext } from "@/server/organization/getDashboardContext";
 import { getOrganizationSettings } from "@/server/organization/getOrganizationSettings";
 import { getOrganizationAttendanceSettings } from "@/server/organization/getOrganizationAttendanceSettings";
 import { getOrganizationLeaveSettings } from "@/server/organization/getOrganizationLeaveSettings";
+import HashScroll from "@/components/shared/dashboard/HashScroll";
 
 type Props = {
   params: Promise<{
@@ -47,11 +48,13 @@ const OrganizationSettings = async ({ params }: Props) => {
   }
 
   return (
-    <div className="w-full max-w-2xl">
+    <>
       <DashboardPageHeader
         title="Organization Settings"
         description="Manage your organization information, attendance, working hours, and leave policies."
       />
+
+      <HashScroll />
 
       <OrganizationSettingsContent
         organization={{
@@ -64,7 +67,7 @@ const OrganizationSettings = async ({ params }: Props) => {
         attendanceSettings={attendanceSettings}
         leaveSettings={leaveSettings}
       />
-    </div>
+    </>
   );
 };
 
