@@ -60,6 +60,10 @@ export async function getOrganizationEmployees({
         title: true,
         createdAt: true,
 
+        // Employee-specific attendance/salary settings
+        customWorkingMinutes: true,
+        basicSalary: true,
+
         user: {
           select: {
             id: true,
@@ -105,6 +109,14 @@ export async function getOrganizationEmployees({
         role: member.role as OrganizationEmployeeRole,
 
         title: member.title,
+
+        // Employee-specific working time override.
+        // null means use organization default.
+        customWorkingMinutes: member.customWorkingMinutes,
+
+        // Convert Prisma Decimal to a serializable number.
+        basicSalary:
+          member.basicSalary != null ? Number(member.basicSalary) : null,
 
         // First team is treated as the current team.
         // null means the employee has no team.

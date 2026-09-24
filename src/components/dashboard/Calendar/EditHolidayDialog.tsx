@@ -22,22 +22,13 @@ import { Label } from "@/components/ui/label";
 
 import { updateOrganizationHoliday } from "@/server/organization/updateOrganizationHoliday";
 import { OrganizationHoliday } from "@/types/organization/holiday";
+import { formatDateForInput } from "@/lib/utils/date";
 
 type EditHolidayDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   holiday: OrganizationHoliday;
   onHolidayUpdated: (holiday: OrganizationHoliday) => void;
-};
-
-const formatDateForInput = (date: Date) => {
-  const parsedDate = new Date(date);
-
-  const year = parsedDate.getFullYear();
-  const month = String(parsedDate.getMonth() + 1).padStart(2, "0");
-  const day = String(parsedDate.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
 };
 
 const EditHolidayDialog = ({

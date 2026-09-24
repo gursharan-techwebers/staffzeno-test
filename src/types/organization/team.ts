@@ -8,6 +8,9 @@ export type OrganizationEmployee = {
   teamId: string | null;
   createdAt: Date;
 
+  customWorkingMinutes: number | null;
+  basicSalary: number | null;
+
   user: {
     id: string;
     name: string;

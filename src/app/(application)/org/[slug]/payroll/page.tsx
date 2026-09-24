@@ -5,6 +5,8 @@ import EmptyState from "@/components/shared/dashboard/EmptyState";
 
 import { getDashboardContext } from "@/server/organization/getDashboardContext";
 import { getOrganizationSettingsStatus } from "@/server/organization/getOrganizationSettingsStatus";
+import PayrollContext from "@/components/dashboard/Payroll/PayrollContent";
+import PayrollContent from "@/components/dashboard/Payroll/PayrollContent";
 
 type Props = {
   params: Promise<{
@@ -16,8 +18,9 @@ const Payroll = async ({ params }: Props) => {
   const { slug } = await params;
 
   // --------------------------------------------------
-  // Resolve authentication + organization + membership
+  // 1. Resolve authentication + organization + membership
   // --------------------------------------------------
+
   const dashboard = await getDashboardContext(slug);
 
   if (!dashboard.success) {
@@ -28,11 +31,37 @@ const Payroll = async ({ params }: Props) => {
     redirect("/");
   }
 
-  const { organization } = dashboard.data;
+  const { organization, membership, user } = dashboard.data;
 
   // --------------------------------------------------
-  // Check organization configuration
+  // 2. Resolve organization permissions
   // --------------------------------------------------
+  //
+  // Everyone can view Payroll.
+  //
+  // Owner:
+  //   → Can view payroll
+  //   → Can manage payroll
+  //
+  // Admin:
+  //   → Can view payroll
+  //   → Can manage payroll
+  //
+  // Regular member:
+  //   → Can view their own payroll
+  //   → Cannot manage organization payroll
+  // --------------------------------------------------
+
+  const isOrganizationOwner = organization.createdById === user.id;
+
+  const isOrganizationAdmin = membership.role === "admin";
+
+  const canManagePayroll = isOrganizationOwner || isOrganizationAdmin;
+
+  // --------------------------------------------------
+  // 3. Check organization configuration
+  // --------------------------------------------------
+
   const settingsStatus = await getOrganizationSettingsStatus({
     organizationId: organization.id,
   });
@@ -42,10 +71,30 @@ const Payroll = async ({ params }: Props) => {
   }
 
   // --------------------------------------------------
-  // Attendance / leave settings are required
+  // 4. Attendance + Leave settings are required
   // --------------------------------------------------
+  //
+  // Owner/Admin:
+  //   → Show setup message
+  //   → Allow configuration
+  //
+  // Regular member:
+  //   → Payroll is unavailable
+  //   → No configuration action
+  // --------------------------------------------------
+
   if (!settingsStatus.attendance || !settingsStatus.leave) {
     const missingSetting = !settingsStatus.attendance ? "attendance" : "leave";
+
+    if (!canManagePayroll) {
+      return (
+        <EmptyState
+          icon={<WalletCardsIcon className="size-6 text-muted-foreground" />}
+          title="Payroll unavailable"
+          description="Payroll has not been configured for this organization yet. Please contact your organization administrator."
+        />
+      );
+    }
 
     return (
       <EmptyState
@@ -58,12 +107,30 @@ const Payroll = async ({ params }: Props) => {
             ? "Configure attendance settings"
             : "Configure leave settings"
         }
-        actionHref={`/org/${organization.slug}/settings?tab=${missingSetting}`}
+        actionHref={`/org/${organization.slug}/settings#${missingSetting}`}
       />
     );
   }
 
-  return <div>Payroll</div>;
+  // --------------------------------------------------
+  // 5. Render Payroll
+  // --------------------------------------------------
+  //
+  // Payroll UI will later receive:
+  //
+  // canManagePayroll
+  // current user's payroll data
+  // organization payroll data for Owner/Admin
+  //
+  // For now, this is only the architectural placeholder.
+  // --------------------------------------------------
+
+  return (
+    <PayrollContent
+      canManagePayroll={canManagePayroll}
+      slug={organization.slug}
+    />
+  );
 };
 
 export default Payroll;

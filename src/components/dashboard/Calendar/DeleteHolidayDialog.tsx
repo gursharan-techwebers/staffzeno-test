@@ -21,24 +21,13 @@ import { Spinner } from "@/components/ui/spinner";
 import { deleteOrganizationHoliday } from "@/server/organization/deleteOrganizationHoliday";
 import { useState } from "react";
 import { OrganizationHoliday } from "@/types/organization/holiday";
+import { formatDay, formatMonth } from "@/lib/utils/date";
 
 type DeleteHolidayDialogProps = {
   open: boolean;
   holiday: OrganizationHoliday | null;
   onOpenChange: (open: boolean) => void;
   onHolidayDeleted: (holidayId: string) => void;
-};
-
-const formatMonth = (date: Date) => {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-  }).format(new Date(date));
-};
-
-const formatDay = (date: Date) => {
-  return new Intl.DateTimeFormat("en-US", {
-    day: "numeric",
-  }).format(new Date(date));
 };
 
 const DeleteHolidayDialog = ({

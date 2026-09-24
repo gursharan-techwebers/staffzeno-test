@@ -33,6 +33,7 @@ model User {
   organizationsCreated Organization[] @relation("CreatedOrganizations")
 
   stripeCustomerId String?
+  attendanceAudits AttendanceAudit[] @relation("AttendanceAuditUpdater")
 
   @@unique([email])
   @@map("user")
@@ -112,6 +113,7 @@ model Organization {
   leaveSettings      OrganizationLeaveSettings?
   holidays           OrganizationHoliday[]
   leaves             Leave[]
+  attendances        Attendance[]
 
   @@unique([slug])
   @@index([createdById])
@@ -141,9 +143,11 @@ model OrganizationAttendanceSettings {
   organizationId String       @unique
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  officeStartTime String
-  officeEndTime   String
-  gracePeriod     Int
+  timezone String
+
+  minimumWorkingMinutes     Int
+  gracePeriod               Int
+  finalizationWindowMinutes Int @default(180)
 
   workingDays      String[]
   workingSaturdays Int[]
@@ -186,11 +190,16 @@ model Member {
   role  String  @default("member")
   title String?
 
+  customWorkingMinutes Int?
+
+  basicSalary Decimal? @db.Decimal(12, 2)
+
   createdAt DateTime @default(now())
 
   leaves         Leave[]
   leaveBalances  LeaveBalance[]
   leaveApprovals LeaveApproval[]
+  attendances    Attendance[]
 
   @@unique([organizationId, userId])
   @@index([organizationId])
@@ -374,4 +383,139 @@ model LeaveApproval {
   @@unique([leaveId, approverMemberId])
   @@index([approverMemberId, status])
   @@map("leave_approval")
+}
+
+enum AttendanceStatus {
+  COMPLETE
+  SHORT
+  ABSENT
+  WEEKEND
+  HOLIDAY
+  INCOMPLETE
+}
+
+model Attendance {
+  id String @id
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  date     DateTime
+  timezone String
+
+  requiredMinutes Int
+
+  workedMinutes    Int @default(0)
+  regularMinutes   Int @default(0)
+  overtimeMinutes  Int @default(0)
+  shortfallMinutes Int @default(0)
+
+  status AttendanceStatus @default(INCOMPLETE)
+
+  isFinalized Boolean   @default(false)
+  finalizedAt DateTime?
+
+  sessions AttendanceSession[]
+  audits   AttendanceAudit[]   @relation("AttendanceAudits")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, memberId, date])
+  @@index([organizationId, date])
+  @@index([organizationId, status])
+  @@index([memberId, date])
+  @@map("attendance")
+}
+
+enum AttendanceSessionStatus {
+  PUNCHED_IN
+  ON_BREAK
+  PUNCHED_OUT
+}
+
+enum AttendanceSessionClosedBy {
+  EMPLOYEE
+  SYSTEM
+  ADMIN
+}
+
+model AttendanceSession {
+  id String @id
+
+  attendanceId String
+  attendance   Attendance @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+
+  sessionNumber Int
+
+  status AttendanceSessionStatus @default(PUNCHED_IN)
+
+  punchedInAt  DateTime
+  punchedOutAt DateTime?
+
+  closedBy           AttendanceSessionClosedBy?
+  warningEmailSentAt DateTime?
+
+  totalSessionMinutes Int @default(0)
+  totalBreakMinutes   Int @default(0)
+  workedMinutes       Int @default(0)
+
+  workSummary String?
+
+  breaks AttendanceBreak[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([attendanceId, sessionNumber])
+  @@index([attendanceId])
+  @@map("attendance_session")
+}
+
+model AttendanceBreak {
+  id String @id
+
+  sessionId String
+  session   AttendanceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  startedAt DateTime
+  endedAt   DateTime?
+
+  durationMinutes Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sessionId])
+  @@index([sessionId, startedAt])
+  @@map("attendance_break")
+}
+
+enum AttendanceAuditAction {
+  UPDATE_ATTENDANCE
+}
+
+model AttendanceAudit {
+  id String @id
+
+  attendanceId String
+
+  attendance Attendance @relation("AttendanceAudits", fields: [attendanceId], references: [id], onDelete: Cascade)
+
+  updatedByUserId String
+
+  updatedByUser User @relation("AttendanceAuditUpdater", fields: [updatedByUserId], references: [id], onDelete: Restrict)
+
+  reason String?
+
+  changes Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([attendanceId, createdAt])
+  @@index([updatedByUserId, createdAt])
+  @@map("attendance_audit")
 }

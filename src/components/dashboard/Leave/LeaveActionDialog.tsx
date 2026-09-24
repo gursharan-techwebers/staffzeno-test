@@ -29,6 +29,7 @@ import type { Leave, ManageLeave } from "@/types/organization/leave";
 import { cancelLeaveRequest } from "@/server/leave/cancelLeaveRequest";
 import { manageLeaveRequest } from "@/server/leave/manageLeaveRequest";
 import { formatLeaveDuration } from "@/lib/utils/formatLeaveDuration";
+import { formatDate } from "@/lib/utils/date";
 
 type LeaveAction = "CANCEL" | "APPROVE" | "REJECT";
 
@@ -42,14 +43,6 @@ type LeaveActionDialogProps = {
     leaveId: string,
     status: "APPROVED" | "REJECTED",
   ) => void;
-};
-
-const formatDate = (date: Date | string) => {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(date));
 };
 
 const formatDateRange = (startDate: Date | string, endDate: Date | string) => {

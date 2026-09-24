@@ -35,13 +35,18 @@ import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 
 import { TitleSchemaInput } from "@/validators/organization/common";
+
 import { UserProfile } from "../UserProfile";
+
 import UserNameAndTitle from "@/components/shared/dashboard/UserNameAndTitle";
+
 import {
   OrganizationEmployee,
   OrganizationEmployeeRole,
   TeamOption,
 } from "@/types/organization/team";
+
+import { ORGANIZATION_WORKING_HOUR_OPTIONS } from "@/constants/organizationDefaultSettings";
 
 type ManageEmployeeDialogProps = {
   employee: OrganizationEmployee | null;
@@ -49,12 +54,15 @@ type ManageEmployeeDialogProps = {
   teams: TeamOption[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
+
   onEmployeeUpdated: (
     memberId: string,
     updates: {
       role: OrganizationEmployeeRole;
       teamId: string | null;
       title: TitleSchemaInput;
+      customWorkingMinutes: number | null;
+      basicSalary: number | null;
     },
   ) => void;
 };
@@ -73,24 +81,48 @@ export function ManageEmployeeDialog({
 
   const [teamId, setTeamId] = useState<string>("none");
 
+  /**
+   * null = use organization default
+   * number = employee-specific working minutes
+   */
+  const [customWorkingMinutes, setCustomWorkingMinutes] = useState<
+    number | null
+  >(null);
+
+  /**
+   * Keep salary as a string while editing so the input
+   * behaves naturally.
+   */
+  const [basicSalary, setBasicSalary] = useState<string>("");
+
   const [isSaving, setIsSaving] = useState(false);
 
   // --------------------------------------------------
   // Initialize form when employee changes
   // --------------------------------------------------
+
   useEffect(() => {
     if (!employee || !open) {
       return;
     }
 
     setRole(employee.role);
+
     setTeamId(employee.teamId ?? "none");
+
     setTitle(employee.title ?? "");
+
+    setCustomWorkingMinutes(employee.customWorkingMinutes ?? null);
+
+    setBasicSalary(
+      employee.basicSalary != null ? String(employee.basicSalary) : "",
+    );
   }, [employee, open]);
 
   // --------------------------------------------------
   // Check whether anything changed
   // --------------------------------------------------
+
   const hasChanges = useMemo(() => {
     if (!employee) {
       return false;
@@ -100,16 +132,24 @@ export function ManageEmployeeDialog({
 
     const originalTitle = employee.title ?? "";
 
+    const originalWorkingMinutes = employee.customWorkingMinutes ?? null;
+
+    const originalSalary =
+      employee.basicSalary != null ? String(employee.basicSalary) : "";
+
     return (
       role !== employee.role ||
       teamId !== originalTeamId ||
-      title !== originalTitle
+      title !== originalTitle ||
+      customWorkingMinutes !== originalWorkingMinutes ||
+      basicSalary !== originalSalary
     );
-  }, [employee, role, teamId, title]);
+  }, [employee, role, teamId, title, customWorkingMinutes, basicSalary]);
 
   // --------------------------------------------------
   // Save changes
   // --------------------------------------------------
+
   const handleSave = async () => {
     if (!employee || !hasChanges || isSaving) {
       return;
@@ -120,12 +160,38 @@ export function ManageEmployeeDialog({
 
       const selectedTeamId = teamId === "none" ? null : teamId;
 
+      /**
+       * Convert salary to number.
+       *
+       * Empty input = null
+       */
+      const salaryValue =
+        basicSalary.trim() === "" ? null : Number(basicSalary);
+
+      /**
+       * Basic client-side validation.
+       */
+      if (
+        salaryValue !== null &&
+        (!Number.isFinite(salaryValue) || salaryValue < 0)
+      ) {
+        toast.error("Invalid salary", {
+          description: "Please enter a valid salary amount.",
+        });
+
+        return;
+      }
+
       const result = await updateOrganizationEmployee({
         organizationId,
         memberId: employee.id,
         role,
         teamId: selectedTeamId,
         title,
+
+        customWorkingMinutes,
+
+        basicSalary: salaryValue,
       });
 
       if (!result.success) {
@@ -137,11 +203,18 @@ export function ManageEmployeeDialog({
         return;
       }
 
+      // --------------------------------------------------
       // Update employee in parent state
+      // --------------------------------------------------
+
       onEmployeeUpdated(employee.id, {
         role: result.data.role,
         teamId: result.data.teamId,
         title,
+
+        customWorkingMinutes: result.data.customWorkingMinutes,
+
+        basicSalary: result.data.basicSalary,
       });
 
       toast.success("Employee updated", {
@@ -171,17 +244,22 @@ export function ManageEmployeeDialog({
           <AlertDialogTitle>Manage employee</AlertDialogTitle>
 
           <AlertDialogDescription>
-            Update this employee&apos;s title, role and team assignment.
+            Update this employee&apos;s profile, role, team, working hours and
+            salary.
           </AlertDialogDescription>
         </AlertDialogHeader>
 
         <Separator />
 
         <div className="space-y-6">
-          {/* Employee */}
+          {/* ------------------------------------------------ */}
+          {/* Employee                                         */}
+          {/* ------------------------------------------------ */}
+
           <div className="rounded-lg">
             <div className="flex items-center gap-3">
               <UserProfile user={employee.user} title={employee.title || ""} />
+
               <UserNameAndTitle
                 name={employee.user.name}
                 title={employee.title || ""}
@@ -189,8 +267,13 @@ export function ManageEmployeeDialog({
             </div>
           </div>
 
+          {/* ------------------------------------------------ */}
+          {/* General Employee Settings                        */}
+          {/* ------------------------------------------------ */}
+
           <FieldGroup className="-space-y-3">
             {/* Title */}
+
             <Field>
               <FieldLabel>Title</FieldLabel>
 
@@ -203,7 +286,8 @@ export function ManageEmployeeDialog({
               />
             </Field>
 
-            {/* Role */}
+            {/* Organization Role */}
+
             <Field>
               <FieldLabel>Organization Role</FieldLabel>
 
@@ -227,6 +311,7 @@ export function ManageEmployeeDialog({
             </Field>
 
             {/* Team */}
+
             <Field>
               <FieldLabel>Team</FieldLabel>
 
@@ -256,7 +341,78 @@ export function ManageEmployeeDialog({
               </Select>
             </Field>
           </FieldGroup>
+
+          {/* ------------------------------------------------ */}
+          {/* Working Hours                                     */}
+          {/* ------------------------------------------------ */}
+
+          <FieldGroup>
+            <Field>
+              <FieldLabel>Employee working hours</FieldLabel>
+
+              <Select
+                value={
+                  customWorkingMinutes === null
+                    ? "organization-default"
+                    : String(customWorkingMinutes)
+                }
+                onValueChange={(value) => {
+                  if (value === "organization-default") {
+                    setCustomWorkingMinutes(null);
+                    return;
+                  }
+
+                  setCustomWorkingMinutes(Number(value));
+                }}
+                disabled={isSaving}
+              >
+                <SelectTrigger id="employee-working-hours" className="w-full">
+                  <SelectValue placeholder="Select minimum working hours" />
+                </SelectTrigger>
+
+                <SelectContent>
+                  {/* Organization Default */}
+
+                  <SelectItem value="organization-default">
+                    Organization default
+                  </SelectItem>
+
+                  {/* Employee-specific options */}
+
+                  {ORGANIZATION_WORKING_HOUR_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={String(option.value)}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </FieldGroup>
+
+          {/* ------------------------------------------------ */}
+          {/* Salary                                            */}
+          {/* ------------------------------------------------ */}
+
+          <FieldGroup>
+            <Field>
+              <FieldLabel>Salary</FieldLabel>
+
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={basicSalary}
+                onChange={(event) => setBasicSalary(event.target.value)}
+                placeholder="Enter salary (Ex: 20000)"
+                disabled={isSaving}
+              />
+            </Field>
+          </FieldGroup>
         </div>
+
+        {/* ------------------------------------------------ */}
+        {/* Footer                                            */}
+        {/* ------------------------------------------------ */}
 
         <AlertDialogFooter className="flex-row gap-2 mt-2">
           <AlertDialogCancel

@@ -31,24 +31,24 @@ export function generateOrganizationSlug(): string {
   return randomInt(min, max + 1).toString();
 }
 
-export function formatDate(date: Date | string) {
-  const formatted = new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).formatToParts(new Date(date));
+// export function formatDate(date: Date | string) {
+//   const formatted = new Intl.DateTimeFormat("en-US", {
+//     month: "short",
+//     day: "numeric",
+//     year: "numeric",
+//     hour: "numeric",
+//     minute: "2-digit",
+//   }).formatToParts(new Date(date));
 
-  const datePart = formatted
-    .filter((part) => ["month", "day", "year"].includes(part.type))
-    .map((part) => part.value)
-    .join(" ");
+//   const datePart = formatted
+//     .filter((part) => ["month", "day", "year"].includes(part.type))
+//     .map((part) => part.value)
+//     .join(" ");
 
-  const timePart = formatted
-    .filter((part) => ["hour", "minute", "dayPeriod"].includes(part.type))
-    .map((part) => part.value)
-    .join("");
+//   const timePart = formatted
+//     .filter((part) => ["hour", "minute", "dayPeriod"].includes(part.type))
+//     .map((part) => part.value)
+//     .join("");
 
-  return `${datePart} at ${timePart}`;
-}
+//   return `${datePart} at ${timePart}`;
+// }

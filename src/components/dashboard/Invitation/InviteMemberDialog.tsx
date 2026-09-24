@@ -91,8 +91,6 @@ const InviteMemberDialog = ({
   }, [open, defaultTeamId, setValue]);
 
   const onSubmit = async (values: InviteMemberInput) => {
-    console.log("FORM SUBMITTED:", values);
-
     try {
       const result = await inviteOrganizationMember({
         title: values.title,
@@ -190,7 +188,7 @@ const InviteMemberDialog = ({
   };
 
   const onInvalid = (formErrors: typeof errors) => {
-    console.log("FORM VALIDATION ERRORS:", formErrors);
+    // console.log("FORM VALIDATION ERRORS:", formErrors);
   };
 
   return (

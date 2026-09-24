@@ -34,6 +34,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import type { Invitation } from "@/types/organization/invitation";
+import { formatDate } from "@/lib/utils/date";
+import { createStatusConfig } from "@/lib/utils/status";
 
 type InvitationTableProps = {
   invitations: Invitation[];
@@ -46,55 +48,29 @@ type InvitationTableProps = {
   onInvitationCancelled?: (invitationId: string) => void;
 };
 
-const formatDate = (date: Date) => {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(date);
-};
-
-const getStatusConfig = (status: string) => {
+const getRequestStatusConfig = (status: string) => {
   switch (status.toLowerCase()) {
     case "pending":
-      return {
-        label: "Pending",
-        className:
-          "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-400",
-        icon: Clock3Icon,
-      };
+      return createStatusConfig("Pending", "warning");
 
     case "accepted":
-      return {
-        label: "Accepted",
-        className:
-          "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-400",
-        icon: CheckCircle2Icon,
-      };
+      return createStatusConfig("Accepted", "success");
 
     case "rejected":
+      return createStatusConfig("Rejected", "danger");
+
     case "cancelled":
     case "canceled":
-      return {
-        label: status.toLowerCase() === "rejected" ? "Rejected" : "Cancelled",
-        className:
-          "border-red-200 bg-red-50 text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400",
-        icon: XCircleIcon,
-      };
+      return createStatusConfig("Cancelled", "danger");
 
     case "expired":
-      return {
-        label: "Expired",
-        className: "border-border bg-muted text-muted-foreground",
-        icon: Clock3Icon,
-      };
+      return createStatusConfig("Expired", "neutral");
 
     default:
-      return {
-        label: status.charAt(0).toUpperCase() + status.slice(1).toLowerCase(),
-        className: "border-border bg-muted text-muted-foreground",
-        icon: Clock3Icon,
-      };
+      return createStatusConfig(
+        status.charAt(0).toUpperCase() + status.slice(1).toLowerCase(),
+        "neutral",
+      );
   }
 };
 
@@ -186,7 +162,7 @@ export function InvitationTable({
 
         <TableBody>
           {invitations.map((invitation) => {
-            const status = getStatusConfig(invitation.status);
+            const status = getRequestStatusConfig(invitation.status);
 
             const StatusIcon = status.icon;
 

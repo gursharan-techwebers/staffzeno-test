@@ -11,9 +11,13 @@ import type { UpdateLeaveManagementInput } from "@/validators/organization/setti
  */
 export const ORGANIZATION_DEFAULT_SETTINGS = {
   attendance: {
-    officeStartTime: "00:00",
-    officeEndTime: "00:01",
+    // IANA timezone used for attendance date/time calculations.
+    timezone: "",
+
+    minimumWorkingMinutes: 240,
     gracePeriod: 0,
+
+    finalizationWindowMinutes: 180,
 
     // Monday-Saturday are working days.
     // Sunday is the weekly day off.
@@ -32,6 +36,94 @@ export const ORGANIZATION_DEFAULT_SETTINGS = {
     leaveEncashmentEnabled: false,
   } satisfies UpdateLeaveManagementInput,
 } as const;
+
+/**
+ * Attendance finalization window.
+ *
+ * Attendance for a calendar day remains open for 3 hours
+ * after the day ends. After this window, employee changes
+ * are no longer allowed. Organization admins/owners can
+ * still make adjustments through the admin workflow.
+ *
+ * Values are stored in minutes.
+ */
+export const ATTENDANCE_FINALIZATION_WINDOW_MINUTES = 180;
+
+/**
+ * Organization working-hour options
+ *
+ * Values are stored in minutes.
+ */
+export const ORGANIZATION_WORKING_HOUR_OPTIONS = [
+  {
+    value: 240,
+    label: "4 hours",
+  },
+  {
+    value: 270,
+    label: "4.5 hours",
+  },
+  {
+    value: 300,
+    label: "5 hours",
+  },
+  {
+    value: 330,
+    label: "5.5 hours",
+  },
+  {
+    value: 360,
+    label: "6 hours",
+  },
+  {
+    value: 390,
+    label: "6.5 hours",
+  },
+  {
+    value: 420,
+    label: "7 hours",
+  },
+  {
+    value: 450,
+    label: "7.5 hours",
+  },
+  {
+    value: 480,
+    label: "8 hours",
+  },
+  {
+    value: 510,
+    label: "8.5 hours",
+  },
+  {
+    value: 540,
+    label: "9 hours",
+  },
+  {
+    value: 570,
+    label: "9.5 hours",
+  },
+  {
+    value: 600,
+    label: "10 hours",
+  },
+  {
+    value: 630,
+    label: "10.5 hours",
+  },
+  {
+    value: 660,
+    label: "11 hours",
+  },
+  {
+    value: 690,
+    label: "11.5 hours",
+  },
+  {
+    value: 720,
+    label: "12 hours",
+  },
+] as const;
 
 /**
  * Organization working days

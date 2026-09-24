@@ -7,6 +7,7 @@ import type {
   WorkingDay,
   WorkingSaturday,
 } from "@/validators/organization/settings/attendance";
+
 import SettingsSection from "@/components/shared/dashboard/SettingsSection";
 import SettingsSidebar, {
   SettingsSidebarItem,
@@ -22,9 +23,12 @@ type OrganizationSettingsContentProps = {
   };
 
   attendanceSettings: {
-    officeStartTime: string;
-    officeEndTime: string;
+    // IANA timezone used for attendance calculations.
+    timezone: string;
+
+    minimumWorkingMinutes: number;
     gracePeriod: number;
+    finalizationWindowMinutes: number;
     workingDays: WorkingDay[];
     workingSaturdays: WorkingSaturday[];
   } | null;
@@ -69,7 +73,7 @@ const OrganizationSettingsContent = ({
   leaveSettings,
 }: OrganizationSettingsContentProps) => {
   return (
-    <div className="flex w-full min-w-0 items-start gap-8 relative">
+    <div className="relative flex w-full min-w-0 items-start gap-8">
       {/* Sidebar */}
 
       <SettingsSidebar

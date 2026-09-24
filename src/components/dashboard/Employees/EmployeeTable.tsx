@@ -50,7 +50,12 @@ import { TitleSchemaInput } from "@/validators/organization/common";
 import { Separator } from "@/components/ui/separator";
 import { UserProfile } from "../UserProfile";
 import UserNameAndTitle from "@/components/shared/dashboard/UserNameAndTitle";
-import { OrganizationEmployee, OrganizationEmployeeRole, TeamOption } from "@/types/organization/team";
+import {
+  OrganizationEmployee,
+  OrganizationEmployeeRole,
+  TeamOption,
+} from "@/types/organization/team";
+import { formatDate } from "@/lib/utils/date";
 
 type EmployeeTableProps = {
   employees: OrganizationEmployee[];
@@ -64,16 +69,10 @@ type EmployeeTableProps = {
       role: OrganizationEmployeeRole;
       teamId: string | null;
       title: TitleSchemaInput;
+      customWorkingMinutes: number | null;
+      basicSalary: number | null;
     },
   ) => void;
-};
-
-const formatDate = (date: Date) => {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(date);
 };
 
 const EmployeeTable = ({
@@ -160,7 +159,10 @@ const EmployeeTable = ({
                 {/* Employee */}
                 <TableCell>
                   <div className="flex items-center gap-3">
-                    <UserProfile user={employee.user} title={employee.title || ""}/>
+                    <UserProfile
+                      user={employee.user}
+                      title={employee.title || ""}
+                    />
                     <UserNameAndTitle
                       name={employee.user.name}
                       title={employee.title || ""}
@@ -285,7 +287,10 @@ const EmployeeTable = ({
           {employeeToRemove && (
             <div className="rounded-lg">
               <div className="flex items-center gap-3">
-                <UserProfile user={employeeToRemove.user} title={employeeToRemove.title || ""}/>
+                <UserProfile
+                  user={employeeToRemove.user}
+                  title={employeeToRemove.title || ""}
+                />
                 <UserNameAndTitle
                   name={employeeToRemove.user.name}
                   title={employeeToRemove.title || ""}

@@ -1,12 +1,12 @@
-import { Clock3Icon, Settings2Icon } from "lucide-react";
+import { CalendarDaysIcon, Clock3Icon, Settings2Icon } from "lucide-react";
 import { redirect } from "next/navigation";
 
-import EmptyState from "@/components/shared/dashboard/EmptyState";
 import CalendarContent from "@/components/dashboard/Calendar/CalendarContent";
+import EmptyState from "@/components/shared/dashboard/EmptyState";
 
-import { getDashboardContext } from "@/server/organization/getDashboardContext";
 import { getOrganizationAttendanceSettings } from "@/server/organization/getOrganizationAttendanceSettings";
 import { getOrganizationHolidays } from "@/server/organization/getOrganizationHolidays";
+import { getDashboardContext } from "@/server/organization/getDashboardContext";
 
 type Props = {
   params: Promise<{
@@ -16,6 +16,12 @@ type Props = {
 
 const Calendar = async ({ params }: Props) => {
   const { slug } = await params;
+
+  /**
+   * ---------------------------------------------------------
+   * 1. Dashboard / authentication context
+   * ---------------------------------------------------------
+   */
 
   const dashboard = await getDashboardContext(slug);
 
@@ -27,7 +33,34 @@ const Calendar = async ({ params }: Props) => {
     redirect("/");
   }
 
-  const { organization, membership } = dashboard.data;
+  const { organization, user } = dashboard.data;
+
+  /**
+   * ---------------------------------------------------------
+   * 2. Resolve organization permissions
+   * ---------------------------------------------------------
+   *
+   * Everyone can view the organization calendar.
+   *
+   * Owner/Admin:
+   *   → Can manage holidays
+   *
+   * Regular member:
+   *   → Can view the calendar
+   *   → Cannot manage holidays
+   */
+
+  const isOrganizationOwner = organization.createdById === user.id;
+
+  const isOrganizationAdmin = dashboard.data.membership.role === "admin";
+
+  const canManageHolidays = isOrganizationOwner || isOrganizationAdmin;
+
+  /**
+   * ---------------------------------------------------------
+   * 3. Load calendar requirements/data
+   * ---------------------------------------------------------
+   */
 
   const [attendanceSettings, holidaysResult] = await Promise.all([
     getOrganizationAttendanceSettings({
@@ -38,7 +71,33 @@ const Calendar = async ({ params }: Props) => {
     }),
   ]);
 
+  /**
+   * ---------------------------------------------------------
+   * 4. Attendance settings are required
+   * ---------------------------------------------------------
+   *
+   * If attendance/calendar settings are not configured:
+   *
+   * Owner/Admin:
+   *   → Show settings-required state
+   *   → Allow them to configure settings
+   *
+   * Regular member:
+   *   → Show calendar unavailable state
+   *   → Do not show configuration action
+   */
+
   if (!attendanceSettings) {
+    if (!canManageHolidays) {
+      return (
+        <EmptyState
+          icon={<CalendarDaysIcon className="size-6 text-muted-foreground" />}
+          title="Calendar unavailable"
+          description="The organization calendar has not been configured yet. Please contact your organization administrator."
+        />
+      );
+    }
+
     return (
       <EmptyState
         icon={<Clock3Icon className="size-6 text-muted-foreground" />}
@@ -51,12 +110,24 @@ const Calendar = async ({ params }: Props) => {
     );
   }
 
+  /**
+   * ---------------------------------------------------------
+   * 5. Validate holiday data
+   * ---------------------------------------------------------
+   */
+
   if (!holidaysResult.success) {
     redirect(`/org/${organization.slug}`);
   }
 
-  const canManageHolidays =
-    membership.role === "owner" || membership.role === "admin";
+  /**
+   * ---------------------------------------------------------
+   * 6. Render calendar
+   * ---------------------------------------------------------
+   *
+   * Everyone can reach this point when attendance settings
+   * are configured.
+   */
 
   return (
     <CalendarContent

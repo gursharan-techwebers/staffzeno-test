@@ -72,6 +72,8 @@ export type ActionErrorCode =
   | "MEMBERSHIP_NOT_FOUND"
   | "LEAVE_DATE_ALREADY_EXISTS"
   | "ROLE_UNCHANGED"
+  |"NOT_STARTED"
+  |"ATTENDANCE_UPDATE_ERROR"
   | "BAD_REQUEST";
 
 export type ActionSuccess<T> = {

@@ -32,37 +32,20 @@ import DeleteHolidayDialog from "./DeleteHolidayDialog";
 
 import EditHolidayDialog from "./EditHolidayDialog";
 import { OrganizationHoliday } from "@/types/organization/holiday";
+import { formatDate, formatMonth } from "@/lib/utils/date";
+import { formatDay } from "react-day-picker";
 
 type CalendarContentProps = {
   holidays: OrganizationHoliday[];
   canManageHolidays: boolean;
   attendanceSettings: {
-    officeStartTime: string;
-    officeEndTime: string;
+    timezone: string;
+    minimumWorkingMinutes: number;
+    finalizationWindowMinutes: number;
     gracePeriod: number;
     workingDays: WorkingDay[];
     workingSaturdays: WorkingSaturday[];
   };
-};
-
-const formatHolidayListDate = (date: Date) => {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(date));
-};
-
-const formatMonth = (date: Date) => {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-  }).format(new Date(date));
-};
-
-const formatDay = (date: Date) => {
-  return new Intl.DateTimeFormat("en-US", {
-    day: "numeric",
-  }).format(new Date(date));
 };
 
 const CalendarContent = ({
@@ -243,7 +226,7 @@ const CalendarContent = ({
                       type="button"
                       onClick={() => handleHolidayClick(holiday)}
                       className="flex size-12 shrink-0 flex-col items-center justify-center rounded-lg bg-muted text-center transition-colors hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      aria-label={`Select ${formatHolidayListDate(
+                      aria-label={`Select ${formatDate(
                         holiday.date,
                       )}`}
                     >

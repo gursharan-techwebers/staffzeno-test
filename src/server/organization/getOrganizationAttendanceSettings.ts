@@ -19,10 +19,12 @@ export async function getOrganizationAttendanceSettings({
     where: {
       organizationId,
     },
+
     select: {
-      officeStartTime: true,
-      officeEndTime: true,
+      timezone: true,
+      minimumWorkingMinutes: true,
       gracePeriod: true,
+      finalizationWindowMinutes: true,
       workingDays: true,
       workingSaturdays: true,
     },

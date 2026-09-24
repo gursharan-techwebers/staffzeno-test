@@ -25,6 +25,17 @@ type UpdateOrganizationEmployeeInput = {
   role: OrganizationEmployeeRole;
   teamId: string | null;
   title: string;
+
+  /**
+   * null = use organization default
+   * number = employee-specific working minutes
+   */
+  customWorkingMinutes: number | null;
+
+  /**
+   * null = no salary configured
+   */
+  basicSalary: number | null;
 };
 
 type UpdateOrganizationEmployeeSuccess = {
@@ -32,6 +43,9 @@ type UpdateOrganizationEmployeeSuccess = {
   role: OrganizationEmployeeRole;
   teamId: string | null;
   title: string | null;
+
+  customWorkingMinutes: number | null;
+  basicSalary: number | null;
 };
 
 export async function updateOrganizationEmployee(
@@ -45,6 +59,10 @@ export async function updateOrganizationEmployee(
   const memberId = input.memberId?.trim();
   const teamId = input.teamId?.trim() || null;
   const title = input.title?.trim() ?? "";
+
+  const customWorkingMinutes = input.customWorkingMinutes ?? null;
+
+  const basicSalary = input.basicSalary ?? null;
 
   if (!organizationId || !memberId) {
     return actionResponse(
@@ -68,6 +86,47 @@ export async function updateOrganizationEmployee(
       "Employee title cannot exceed 100 characters.",
       "BAD_REQUEST",
     );
+  }
+
+  // --------------------------------------------------
+  // Validate custom working minutes
+  // --------------------------------------------------
+
+  if (customWorkingMinutes !== null) {
+    if (!Number.isInteger(customWorkingMinutes) || customWorkingMinutes <= 0) {
+      return actionResponse(
+        ACTION_STATUS.BAD_REQUEST,
+        "Custom working time must be a positive number of minutes.",
+        "BAD_REQUEST",
+      );
+    }
+
+    /**
+     * Prevent unreasonable values.
+     *
+     * 24 hours = 1440 minutes.
+     */
+    if (customWorkingMinutes > 1440) {
+      return actionResponse(
+        ACTION_STATUS.BAD_REQUEST,
+        "Custom working time cannot exceed 24 hours.",
+        "BAD_REQUEST",
+      );
+    }
+  }
+
+  // --------------------------------------------------
+  // Validate basic salary
+  // --------------------------------------------------
+
+  if (basicSalary !== null) {
+    if (!Number.isFinite(basicSalary) || basicSalary < 0) {
+      return actionResponse(
+        ACTION_STATUS.BAD_REQUEST,
+        "Basic salary must be a valid non-negative amount.",
+        "BAD_REQUEST",
+      );
+    }
   }
 
   try {
@@ -226,6 +285,7 @@ export async function updateOrganizationEmployee(
     // --------------------------------------------------
 
     const previousRole = memberToUpdate.role;
+
     const newRole = input.role;
 
     const roleChanged = previousRole !== newRole;
@@ -259,7 +319,7 @@ export async function updateOrganizationEmployee(
     const requestHeaders = await headers();
 
     // --------------------------------------------------
-    // 12. Update employee role/title
+    // 12. Update employee
     // --------------------------------------------------
 
     const updatedMember = await prisma.member.update({
@@ -269,11 +329,16 @@ export async function updateOrganizationEmployee(
       data: {
         role: input.role,
         title: title || null,
+
+        customWorkingMinutes,
+        basicSalary,
       },
       select: {
         id: true,
         role: true,
         title: true,
+        customWorkingMinutes: true,
+        basicSalary: true,
       },
     });
 
@@ -335,9 +400,23 @@ export async function updateOrganizationEmployee(
       ACTION_STATUS.OK,
       {
         memberId: updatedMember.id,
+
         role: updatedMember.role as "admin" | "member",
+
         teamId,
+
         title: updatedMember.title,
+
+        customWorkingMinutes: updatedMember.customWorkingMinutes,
+
+        /**
+         * Prisma Decimal values need to be
+         * converted before returning to the client.
+         */
+        basicSalary:
+          updatedMember.basicSalary != null
+            ? Number(updatedMember.basicSalary)
+            : null,
       },
       "Employee updated successfully.",
     );

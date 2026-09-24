@@ -1,9 +1,16 @@
 import { Clock3Icon, Settings2Icon } from "lucide-react";
 import { redirect } from "next/navigation";
 
+import AttendanceContent from "@/components/dashboard/Attendance/AttendanceContent";
 import EmptyState from "@/components/shared/dashboard/EmptyState";
-import { getOrganizationSettingsStatus } from "@/server/organization/getOrganizationSettingsStatus";
+
 import { getDashboardContext } from "@/server/organization/getDashboardContext";
+import { getOrganizationSettingsStatus } from "@/server/organization/getOrganizationSettingsStatus";
+
+import type { ManageAttendance } from "@/types/organization/attendance";
+import type { Attendance } from "@/types/organization/attendance";
+import { getMemberAttendance } from "@/server/attendance/getMemberAttendance";
+import { getOrganizationAttendance } from "@/server/attendance/getOrganizationAttendance";
 
 type Props = {
   params: Promise<{
@@ -13,6 +20,12 @@ type Props = {
 
 const Attendance = async ({ params }: Props) => {
   const { slug } = await params;
+
+  /**
+   * ---------------------------------------------------------
+   * 1. Dashboard / authentication context
+   * ---------------------------------------------------------
+   */
 
   const dashboard = await getDashboardContext(slug);
 
@@ -24,7 +37,28 @@ const Attendance = async ({ params }: Props) => {
     redirect("/");
   }
 
-  const { organization } = dashboard.data;
+  const { organization, membership, user } = dashboard.data;
+
+  /**
+   * ---------------------------------------------------------
+   * 2. Resolve permissions
+   * ---------------------------------------------------------
+   */
+
+  const isOrganizationOwner = organization.createdById === user.id;
+  const isOrganizationAdmin = membership.role === "admin";
+
+  const canManageAttendance = isOrganizationOwner || isOrganizationAdmin;
+
+  const canConfigureAttendance = isOrganizationOwner || isOrganizationAdmin;
+
+  const canAdjustAttendance = isOrganizationOwner || isOrganizationAdmin;
+
+  /**
+   * ---------------------------------------------------------
+   * 3. Check attendance settings
+   * ---------------------------------------------------------
+   */
 
   const settingsStatus = await getOrganizationSettingsStatus({
     organizationId: organization.id,
@@ -35,6 +69,16 @@ const Attendance = async ({ params }: Props) => {
   }
 
   if (!settingsStatus.attendance) {
+    if (!canManageAttendance) {
+      return (
+        <EmptyState
+          icon={<Clock3Icon className="size-6 text-muted-foreground" />}
+          title="Attendance unavailable"
+          description="Attendance has not been configured for this organization yet. Please contact your organization administrator."
+        />
+      );
+    }
+
     return (
       <EmptyState
         icon={<Clock3Icon className="size-6 text-muted-foreground" />}
@@ -47,7 +91,38 @@ const Attendance = async ({ params }: Props) => {
     );
   }
 
-  return <div>Attendance</div>;
+  /**
+   * ---------------------------------------------------------
+   * 4. Resolve actual attendance
+   * ---------------------------------------------------------
+   */
+
+  const myAttendance = await getMemberAttendance({
+    organizationId: organization.id,
+    memberId: membership.id,
+  });
+
+  const manageableAttendance = canManageAttendance
+    ? await getOrganizationAttendance({
+        organizationId: organization.id,
+      })
+    : [];
+
+  /**
+   * ---------------------------------------------------------
+   * 5. Render
+   * ---------------------------------------------------------
+   */
+
+  return (
+    <AttendanceContent
+      myAttendance={myAttendance}
+      manageableAttendance={manageableAttendance}
+      canManageAttendance={canManageAttendance}
+      canConfigureAttendance={canConfigureAttendance}
+      canAdjustAttendance={canAdjustAttendance}
+    />
+  );
 };
 
 export default Attendance;

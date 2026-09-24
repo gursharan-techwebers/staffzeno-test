@@ -110,8 +110,8 @@ const Leave = async ({ params }: Props) => {
           icon={
             <CalendarDaysIcon className="size-6 text-muted-foreground" />
           }
-          title="Leave management unavailable"
-          description="Leave management has not been configured for this organization yet. Please contact your organization administrator."
+          title="Leaves unavailable"
+          description="Leaves has not been configured for this organization yet. Please contact your organization administrator."
         />
       );
     }

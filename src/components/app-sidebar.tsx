@@ -40,12 +40,6 @@ type Organization = {
   slug: string;
 };
 
-type Team = {
-  id: string;
-  name: string;
-  memberCount: number;
-};
-
 type UserOrganization = {
   id: string;
   name: string;
@@ -188,7 +182,6 @@ export function AppSidebar({
                 className="size-5 rounded-full object-cover"
               />
             ) : undefined,
-            plan: "Starter",
           }))}
           activeOrganizationId={organization.id}
         />

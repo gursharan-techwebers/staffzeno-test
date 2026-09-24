@@ -49,6 +49,7 @@ import { ManageTeamDialog } from "../ManageTeamDialog";
 import { UserProfile } from "../../UserProfile";
 import UserNameAndTitle from "@/components/shared/dashboard/UserNameAndTitle";
 import { Team } from "@/types/organization/team";
+import { formatDate } from "@/lib/utils/date";
 
 type TeamTableProps = {
   teams: Team[];
@@ -61,14 +62,6 @@ type TeamTableProps = {
       adminUserIds: string[];
     },
   ) => void;
-};
-
-const formatDate = (date: Date) => {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(date));
 };
 
 export function AllTeamsTable({

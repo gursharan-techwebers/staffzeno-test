@@ -1,3 +1,4 @@
+import { LogoutButton } from "@/components/auth/logout-button";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -15,6 +16,9 @@ const OnboardingLayout = ({ children }: { children: React.ReactNode }) => {
               className="h-auto w-30 md:w-33"
             />
           </Link>
+        </div>
+        <div className="absolute bottom-6 right-1/2 translate-x-1/2 md:top-10 md:right-10 md:translate-x-0">
+          <LogoutButton />
         </div>
 
         <div className="flex flex-1 items-center justify-center">

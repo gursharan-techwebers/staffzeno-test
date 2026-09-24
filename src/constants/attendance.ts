@@ -1,0 +1,2 @@
+export const MAX_WORK_SUMMARY_LENGTH = 1000;
+

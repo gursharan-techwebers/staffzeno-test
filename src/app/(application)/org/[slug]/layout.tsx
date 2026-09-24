@@ -18,6 +18,8 @@ import DashboardContentSkeleton from "@/components/dashboard/DashboardContentSke
 import TopLoadingBar from "@/components/TopLoadingBar";
 import { getSidebarTeams } from "@/server/team/getSidebarTeams";
 import BackButton from "@/components/shared/dashboard/BackButton";
+import AttendanceActionButton from "@/components/dashboard/Attendance/AttendanceActionButton";
+import { getCurrentAttendanceState } from "@/server/attendance/getCurrentAttendanceState";
 
 type Props = {
   children: React.ReactNode;
@@ -65,6 +67,11 @@ const DashboardLayout = async ({ children, params }: Props) => {
     }),
   ]);
 
+  const attendanceState = await getCurrentAttendanceState({
+    organizationId: organization.id,
+    memberId: membership.id,
+  });
+
   return (
     <>
       <TopLoadingBar />
@@ -80,9 +87,9 @@ const DashboardLayout = async ({ children, params }: Props) => {
         />
 
         <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
-            <div className="flex items-center gap-2 px-4">
-              <BackButton className="hidden md:flex"/>
+          <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 px-4">
+            <div className="flex flex-1 items-center gap-2">
+              <BackButton className="hidden md:flex" />
 
               <SidebarTrigger className="-ml-1 md:hidden" />
 
@@ -96,6 +103,12 @@ const DashboardLayout = async ({ children, params }: Props) => {
                 teams={teams}
               />
             </div>
+
+            <AttendanceActionButton
+              organizationId={organization.id}
+              memberId={membership.id}
+              initialState={attendanceState}
+            />
           </header>
 
           <div className="mt-4 flex flex-1 flex-col gap-4 p-5 pt-0">

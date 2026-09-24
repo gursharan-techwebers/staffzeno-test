@@ -123,3 +123,22 @@ export type LeaveCancelledEmailProps = {
   reason?: string;
   url: string;
 };
+
+export type AttendanceUpdatedEmailProps = {
+  email: string;
+  name: string;
+  organizationName: string;
+  attendanceDate: string;
+  updatedByName: string;
+  reason: string;
+  sessions: {
+    sessionNumber: number;
+    startTime: string;
+    endTime: string;
+    breaks?: {
+      startTime: string;
+      endTime: string;
+    }[];
+  }[];
+  url: string;
+};

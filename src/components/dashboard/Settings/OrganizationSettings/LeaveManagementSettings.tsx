@@ -252,17 +252,9 @@ const LeaveManagementSettings = ({
       {/* Short Leave Duration */}
 
       <section className="space-y-4">
-        <div>
-          <h4 className="text-sm font-medium">Short leave</h4>
-
-          <p className="mt-1 text-sm text-muted-foreground">
-            Define the maximum duration allowed for a single short leave.
-          </p>
-        </div>
-
         <Field>
           <FieldLabel htmlFor="short-leave-duration">
-            Short leave duration
+            Maximum Short leave duration
           </FieldLabel>
 
           <div className="relative">
@@ -291,6 +283,8 @@ const LeaveManagementSettings = ({
               </SelectContent>
             </Select>
           </div>
+
+          <FieldDescription>Define the maximum duration allowed for a single short leave.</FieldDescription>
 
           {errors.shortLeaveDuration && (
             <FieldError>{errors.shortLeaveDuration.message}</FieldError>

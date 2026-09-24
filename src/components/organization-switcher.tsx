@@ -35,7 +35,6 @@ type Organization = {
   id: string;
   name: string;
   logo?: React.ReactNode;
-  plan: string;
   slug: string;
 };
 
@@ -141,7 +140,7 @@ export function OrganizationSwitcher({
                   </span>
 
                   <span className="truncate text-xs text-muted-foreground ml-0.5 mt-0.5">
-                    {activeOrganization.plan}
+                    On StaffZeno
                   </span>
                 </div>
 
@@ -188,7 +187,12 @@ export function OrganizationSwitcher({
                   <span className="flex-1">{organization.name}</span>
 
                   {organization.id === activeOrganization.id && (
-                      <Badge variant={"outline"} className="after:size-1.5 after:bg-green-500 after:rounded-full after:ml-0.5">Active</Badge>
+                    <Badge
+                      variant={"outline"}
+                      className="after:size-1.5 after:bg-green-500 after:rounded-full after:ml-0.5"
+                    >
+                      Active
+                    </Badge>
                   )}
                 </DropdownMenuItem>
               ))}

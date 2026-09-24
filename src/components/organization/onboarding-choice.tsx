@@ -60,8 +60,6 @@ const OnboardingChoice = () => {
             Ask your company owner or administrator to invite you to their
             organization.
           </p>
-
-          <LogoutButton/>
         </div>
       </div>
 

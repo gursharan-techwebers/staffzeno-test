@@ -17,9 +17,10 @@ import { getAuthContext } from "../auth/getAuthContext";
 type UpdatedAttendanceSettings = {
   id: string;
   organizationId: string;
-  officeStartTime: string;
-  officeEndTime: string;
+  timezone: string;
+  minimumWorkingMinutes: number;
   gracePeriod: number;
+  finalizationWindowMinutes: number;
   workingDays: string[];
   workingSaturdays: number[];
   createdAt: Date;
@@ -30,8 +31,7 @@ export async function updateOrganizationAttendanceSettings(
   values: UpdateAttendanceSettingsInput,
 ): Promise<ActionResult<UpdatedAttendanceSettings>> {
   // 1. Validate input first
-  const validation =
-    updateAttendanceSettingsSchema.safeParse(values);
+  const validation = updateAttendanceSettingsSchema.safeParse(values);
 
   if (!validation.success) {
     return actionResponse(
@@ -59,8 +59,7 @@ export async function updateOrganizationAttendanceSettings(
     const { session, user } = authContext;
 
     // 3. Get active organization
-    const organizationId =
-      session.activeOrganizationId;
+    const organizationId = session.activeOrganizationId;
 
     if (!organizationId) {
       return actionResponse(
@@ -98,42 +97,63 @@ export async function updateOrganizationAttendanceSettings(
     }
 
     // 5. Create or update attendance settings
-    const updatedSettings =
-      await prisma.organizationAttendanceSettings.upsert({
-        where: {
-          organizationId,
-        },
+    const updatedSettings = await prisma.organizationAttendanceSettings.upsert({
+      where: {
+        organizationId,
+      },
 
-        update: {
-          officeStartTime: data.officeStartTime,
-          officeEndTime: data.officeEndTime,
-          gracePeriod: data.gracePeriod,
-          workingDays: data.workingDays,
-          workingSaturdays: data.workingSaturdays,
-        },
+      update: {
+        timezone: data.timezone,
 
-        create: {
-          id: crypto.randomUUID(),
-          organizationId,
-          officeStartTime: data.officeStartTime,
-          officeEndTime: data.officeEndTime,
-          gracePeriod: data.gracePeriod,
-          workingDays: data.workingDays,
-          workingSaturdays: data.workingSaturdays,
-        },
+        minimumWorkingMinutes: data.minimumWorkingMinutes,
 
-        select: {
-          id: true,
-          organizationId: true,
-          officeStartTime: true,
-          officeEndTime: true,
-          gracePeriod: true,
-          workingDays: true,
-          workingSaturdays: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      });
+        gracePeriod: data.gracePeriod,
+
+        finalizationWindowMinutes: data.finalizationWindowMinutes,
+
+        workingDays: data.workingDays,
+
+        workingSaturdays: data.workingSaturdays,
+      },
+
+      create: {
+        id: crypto.randomUUID(),
+
+        organizationId,
+
+        timezone: data.timezone,
+
+        minimumWorkingMinutes: data.minimumWorkingMinutes,
+
+        gracePeriod: data.gracePeriod,
+
+        finalizationWindowMinutes: data.finalizationWindowMinutes,
+
+        workingDays: data.workingDays,
+
+        workingSaturdays: data.workingSaturdays,
+      },
+
+      select: {
+        id: true,
+        organizationId: true,
+
+        timezone: true,
+
+        minimumWorkingMinutes: true,
+
+        gracePeriod: true,
+
+        finalizationWindowMinutes: true,
+
+        workingDays: true,
+
+        workingSaturdays: true,
+
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
 
     // 6. Return success
     return actionResponse(

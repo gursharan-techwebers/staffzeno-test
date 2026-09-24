@@ -32,8 +32,8 @@ import { revokeOtherUserSessions } from "@/server/user/revokeOtherUserSessions";
 import { revokeAllUserSessions } from "@/server/user/revokeAllUserSessions";
 
 import type { SecuritySession } from "@/types/auth/session";
-import { formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { formatDate } from "@/lib/utils/date";
 
 type SecuritySettingsProps = {
   lastPasswordChangedAt: Date | null;

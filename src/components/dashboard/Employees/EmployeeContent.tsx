@@ -11,7 +11,11 @@ import { EmployeeTable } from "./EmployeeTable";
 
 import type { Invitation } from "@/types/organization/invitation";
 import type { TitleSchemaInput } from "@/validators/organization/common";
-import { OrganizationEmployee, OrganizationEmployeeRole, TeamOption } from "@/types/organization/team";
+import {
+  OrganizationEmployee,
+  OrganizationEmployeeRole,
+  TeamOption,
+} from "@/types/organization/team";
 
 type EmployeeContentProps = {
   employees: OrganizationEmployee[];
@@ -63,6 +67,8 @@ const EmployeeContent = ({
       role: OrganizationEmployeeRole;
       teamId: string | null;
       title: TitleSchemaInput;
+      customWorkingMinutes: number | null;
+      basicSalary: number | null;
     },
   ) => {
     setEmployees((current) =>
@@ -81,6 +87,9 @@ const EmployeeContent = ({
           title: updates.title || null,
           teamId: updates.teamId,
           teams: updatedTeam ? [updatedTeam] : [],
+
+          customWorkingMinutes: updates.customWorkingMinutes,
+          basicSalary: updates.basicSalary,
         };
       }),
     );

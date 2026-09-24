@@ -41,6 +41,8 @@ import type {
   ManageLeave,
 } from "@/types/organization/leave";
 import { formatLeaveDuration } from "@/lib/utils/formatLeaveDuration";
+import { formatDate } from "@/lib/utils/date";
+import { createStatusConfig } from "@/lib/utils/status";
 
 type LeaveTableProps =
   | {
@@ -61,14 +63,6 @@ type LeaveTableProps =
 
 type LeaveAction = "CANCEL" | "APPROVE" | "REJECT";
 
-const formatDate = (date: Date | string) => {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(date));
-};
-
 const formatDateRange = (startDate: Date | string, endDate: Date | string) => {
   const start = new Date(startDate);
   const end = new Date(endDate);
@@ -80,45 +74,22 @@ const formatDateRange = (startDate: Date | string, endDate: Date | string) => {
   return `${formatDate(start)} – ${formatDate(end)}`;
 };
 
-const getStatusConfig = (status: LeaveStatus) => {
+const getLeaveStatusConfig = (status: LeaveStatus) => {
   switch (status) {
     case "PENDING":
-      return {
-        label: "Pending",
-        className:
-          "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-400",
-        icon: Clock3Icon,
-      };
+      return createStatusConfig("Pending", "warning");
 
     case "APPROVED":
-      return {
-        label: "Approved",
-        className:
-          "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-400",
-        icon: CheckCircle2Icon,
-      };
+      return createStatusConfig("Approved", "success");
 
     case "REJECTED":
-      return {
-        label: "Rejected",
-        className:
-          "border-red-200 bg-red-50 text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400",
-        icon: XCircleIcon,
-      };
+      return createStatusConfig("Rejected", "danger");
 
     case "CANCELLED":
-      return {
-        label: "Cancelled",
-        className: "border-border bg-muted text-muted-foreground",
-        icon: BanIcon,
-      };
+      return createStatusConfig("Cancelled", "neutral");
 
     default:
-      return {
-        label: status,
-        className: "border-border bg-muted text-muted-foreground",
-        icon: Clock3Icon,
-      };
+      return createStatusConfig(status, "neutral");
   }
 };
 
@@ -204,7 +175,7 @@ export function LeaveTable({
 
           <TableBody>
             {leaves.map((leave) => {
-              const status = getStatusConfig(leave.status);
+              const status = getLeaveStatusConfig(leave.status);
               const StatusIcon = status.icon;
 
               const leaveType = LEAVE_TYPES[leave.leaveType];

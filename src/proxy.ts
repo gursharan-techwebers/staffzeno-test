@@ -63,5 +63,5 @@ export default function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api/auth|api/webhooks).*)"],
+  matcher: ["/((?!api/auth|api/webhooks|api/cron).*)"],
 };
