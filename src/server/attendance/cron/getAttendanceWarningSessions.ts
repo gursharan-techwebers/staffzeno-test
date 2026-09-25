@@ -11,6 +11,7 @@ export type AttendanceWarningSession = {
   punchedInAt: Date;
   employeeName: string;
   employeeEmail: string;
+  organizationSlug: string;
 };
 
 type GetAttendanceWarningSessionsInput = {
@@ -50,6 +51,12 @@ export async function getAttendanceWarningSessions({
         select: {
           id: true,
 
+          organization: {
+            select: {
+              slug: true,
+            },
+          },
+
           member: {
             select: {
               user: {
@@ -76,5 +83,6 @@ export async function getAttendanceWarningSessions({
     punchedInAt: session.punchedInAt,
     employeeName: session.attendance.member.user.name,
     employeeEmail: session.attendance.member.user.email,
+    organizationSlug: session.attendance.organization.slug
   }));
 }

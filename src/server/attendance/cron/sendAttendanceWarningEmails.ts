@@ -20,7 +20,7 @@ export async function sendAttendanceWarningEmails(
         email: session.employeeEmail,
         name: session.employeeName,
         punchedInAt: session.punchedInAt,
-        url: `${process.env.NEXT_PUBLIC_APP_URL}`,
+        url: `${process.env.NEXT_PUBLIC_APP_URL}/org/${session.organizationSlug}/attendance`,
       });
 
       await prisma.attendanceSession.updateMany({

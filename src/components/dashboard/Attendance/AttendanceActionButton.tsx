@@ -85,14 +85,12 @@ export default function AttendanceActionButton({
    */
 
   useEffect(() => {
-    if (state.status !== "WORKING") {
+    if (state.status !== "WORKING" || !state.punchedInAt) {
       return;
     }
 
-    const punchedInAt = state.punchedInAt;
-
     const updateWorkingTime = () => {
-      setWorkingSeconds(getElapsedSeconds(punchedInAt));
+      setWorkingSeconds(getElapsedSeconds(state.punchedInAt));
     };
 
     updateWorkingTime();
@@ -102,7 +100,7 @@ export default function AttendanceActionButton({
     return () => {
       window.clearInterval(interval);
     };
-  }, [state.status]);
+  }, [state.status, state.punchedInAt]);
 
   /**
    * ---------------------------------------------------------
